@@ -1,4 +1,4 @@
-ketstore
+keystore
 ========
 
-for storing, managing and retrieving secret things
+Storing secret things.

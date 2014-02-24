@@ -1,0 +1,13 @@
+{ "debug.enabled"    : true
+, "verify.enabled"   : true
+, "backup.keys"      : []
+, "hash.comment"     : "default"
+, "hash.prf"         : "sha512"
+, "hash.iterations"  : 5000
+, "hash.width_octets": 64
+, "hash.salt_octets" : 16
+, "crypt.cipher"     : "aes256"
+, "crypt.prf"        : "sha512"
+, "crypt.iterations" : 5000
+, "crypt.salt_octets": 16
+}

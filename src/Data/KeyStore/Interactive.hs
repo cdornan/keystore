@@ -31,6 +31,7 @@ module Data.KeyStore.Interactive
     , loadKey
     , showIdentity
     , showComment
+    , showDate
     , showHash
     , showHashComment
     , showHashSalt
@@ -76,11 +77,13 @@ import qualified Data.ByteString.Char8          as B
 import qualified Data.ByteString.Lazy.Char8     as LBS
 import qualified Data.ByteString.Base64         as B64
 import qualified Data.Map                       as Map
+import           Data.Time
 import           Text.Printf
 import           Control.Applicative
 import qualified Control.Exception              as X
 import           Control.Lens
 import           System.IO
+import           System.Locale
 
 
 instanceCtx :: CtxParams -> IO IC
@@ -172,6 +175,11 @@ showIdentity ic = show_it' ic "identity" (Just . _key_identity) (B.pack . T.unpa
 
 showComment :: IC -> Bool -> Name -> IO B.ByteString
 showComment ic = show_it' ic "comment"  (Just . _key_comment)  (B.pack . T.unpack . _Comment )
+
+showDate :: IC -> Bool -> Name -> IO B.ByteString
+showDate ic = show_it' ic "date" (Just . _key_created_at) (B.pack . formatTime defaultTimeLocale fmt)
+  where
+    fmt = "%F-%TZ"
 
 showHash :: IC -> Bool -> Name -> IO B.ByteString
 showHash ic = show_it ic "hash" (fmap _hash_hash . _key_hash) _HashData

@@ -31,8 +31,13 @@ data SubCommand
     | Secure          Name                        (Maybe FilePath) [Safeguard]
     | List
     | Info           [Name]
-    | ShowHash   Bool Name
-    | ShowPublic Bool Name
+    | ShowIdentity    Bool Name
+    | ShowComment     Bool Name
+    | ShowDate        Bool Name
+    | ShowHash        Bool Name
+    | ShowHashComment Bool Name
+    | ShowHashSalt    Bool Name
+    | ShowPublic      Bool Name
     | ShowSecret Bool Name
     | Encrypt         Name    FilePath FilePath
     | Decrypt                 FilePath FilePath
@@ -85,7 +90,12 @@ p_sub_command =
      <> command "secure"            pi_secure
      <> command "list"              pi_list
      <> command "info"              pi_info
+     <> command "show-identity"     pi_show_identity
+     <> command "show-comment"      pi_show_comment
+     <> command "show-date"         pi_show_date
      <> command "show-hash"         pi_show_hash
+     <> command "show-hash-comment" pi_show_hash_comment
+     <> command "show-hash-salt"    pi_show_hash_salt
      <> command "show-public"       pi_show_public
      <> command "show-secret"       pi_show_secret
      <> command "encrypt"           pi_encrypt
@@ -103,7 +113,12 @@ pi_initialise
     , pi_secure
     , pi_list
     , pi_info
+    , pi_show_identity
+    , pi_show_comment
+    , pi_show_date
     , pi_show_hash
+    , pi_show_hash_comment
+    , pi_show_hash_salt
     , pi_show_public
     , pi_show_secret
     , pi_encrypt
@@ -182,9 +197,44 @@ pi_info =
             <$> many p_name)
         (progDesc "list individual keys or all keys in the store")
 
+pi_show_identity =
+    h_info
+        (ShowIdentity
+            <$> p_armour
+            <*> p_name)
+        (progDesc "show the hash of the secret text")
+
+pi_show_comment =
+    h_info
+        (ShowComment
+            <$> p_armour
+            <*> p_name)
+        (progDesc "show the hash of the secret text")
+
+pi_show_date =
+    h_info
+        (ShowDate
+            <$> p_armour
+            <*> p_name)
+        (progDesc "show the hash of the secret text")
+
 pi_show_hash =
     h_info
         (ShowHash
+            <$> p_armour
+            <*> p_name)
+        (progDesc "show the hash of the secret text")
+
+pi_show_hash_comment =
+    h_info
+        (ShowHashComment
+            <$> p_armour
+            <*> p_name)
+        (progDesc "show the hash of the secret text")
+
+pi_show_hash_salt =
+    h_info
+        (ShowHashSalt
             <$> p_armour
             <*> p_name)
         (progDesc "show the hash of the secret text")

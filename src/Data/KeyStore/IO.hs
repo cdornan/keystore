@@ -31,6 +31,7 @@ import qualified Data.ByteString.Base64         as B64
 import qualified Data.ByteString.Char8          as B
 import qualified Data.ByteString.Lazy.Char8     as LBS
 import           Data.Maybe
+import           Data.Time
 import qualified Control.Exception              as X
 import           Control.Applicative
 import           System.Environment
@@ -75,9 +76,11 @@ determineCtx CtxParams{..} =
                   Just str_fp -> return str_fp
           Just str_fp -> return str_fp
     cwd <- getCurrentDirectory
+    now <- getCurrentTime
     let str_fp = cwd </> str_fp_
         ctx0   = Ctx
-                    { ctx_store    = str_fp
+                    { ctx_now      = now
+                    , ctx_store    = str_fp
                     , ctx_settings = defaultSettings
                     }
     ks  <- readKeyStore ctx0
@@ -112,7 +115,10 @@ readKeyStore :: Ctx -> IO KeyStore
 readKeyStore ctx = ioE $ keyStoreFromBytes <$> LBS.readFile (ctx_store ctx)
 
 scanEnv :: KeyStore -> IO (KeyStore,[LogEntry])
-scanEnv ks = s_e <$> mapM lu k_evs
+scanEnv ks = getCurrentTime >>= \now -> scanEnv' now ks
+
+scanEnv' :: UTCTime -> KeyStore -> IO (KeyStore,[LogEntry])
+scanEnv' now ks = s_e <$> mapM lu k_evs
   where
     lu (key,EnvVar enm) = fmap ((,) key) <$> lookupEnv (T.unpack enm)
 
@@ -145,7 +151,8 @@ scanEnv ks = s_e <$> mapM lu k_evs
 
     ctx   =
         Ctx
-            { ctx_store    = ""
+            { ctx_now      = now
+            , ctx_store    = ""
             , ctx_settings = defaultSettings
             }
 

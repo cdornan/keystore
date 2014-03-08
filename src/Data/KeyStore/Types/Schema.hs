@@ -83,6 +83,7 @@ key :: Key
         secret_copies :: EncrypedCopyMap
         clear_text    :: ? ClearText
         clear_private :: ? PrivateKey
+        created_at    :: utc
 
 hash :: Hash
     = record

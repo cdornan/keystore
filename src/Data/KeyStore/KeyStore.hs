@@ -39,6 +39,7 @@ import qualified Data.Map                       as Map
 import qualified Data.Text                      as T
 import           Data.Maybe
 import           Data.List
+import           Data.Time
 import           Text.Printf
 import           Crypto.PubKey.RSA
 import           Control.Applicative
@@ -183,7 +184,8 @@ createKey :: Name             -- ^ (unique) name of the new key
           -> Maybe ClearText  -- ^ (optionally) the clear test copy
           -> KS ()
 createKey nm cmt ide mb_ev mb_ct = withKey nm $
- do insertNewKey
+ do now <- currentTime
+    insertNewKey
         Key
             { _key_name          = nm
             , _key_comment       = cmt
@@ -195,6 +197,7 @@ createKey nm cmt ide mb_ev mb_ct = withKey nm $
             , _key_secret_copies = Map.empty
             , _key_clear_text    = Nothing
             , _key_clear_private = Nothing
+            , _key_created_at    = now
             }
     maybe (return ()) (rememberKey nm) mb_ct
 
@@ -280,6 +283,7 @@ info nm =
 
 data Line
     = LnHeader        String
+    | LnDate          UTCTime
     | LnHash          String
     | LnCopiesHeader
     | LnCopy          String
@@ -288,17 +292,19 @@ data Line
 list_key :: Bool -> Key -> String
 list_key True  key@Key{..} =
     unlines $ map fmt $
-        [ LnHeader hdr                               ] ++
-        [ LnHash   hsh       | Just hsh<-[mb_hsh]    ] ++
-        [ LnCopiesHeader                             ] ++
-        [ LnCopy $ fmt_ec ec | ec<-Map.elems $ _key_secret_copies ]
+        [ LnHeader hdr                                     ] ++
+        [ LnDate   _key_created_at                         ] ++
+        [ LnHash   hsh             | Just hsh<-[mb_hsh]    ] ++
+        [ LnCopiesHeader                                   ] ++
+        [ LnCopy $ fmt_ec ec       | ec<-Map.elems $ _key_secret_copies ]
   where
     fmt ln =
         case ln of
           LnHeader             s -> s
-          LnHash               s -> fmt_ln  2 "Hash:"   s
-          LnCopiesHeader         -> fmt_ln  2 "Copies:" ""
-          LnCopy               s -> fmt_ln_ 4           s
+          LnDate               u -> fmt_ln  2 "Date:"   $ show u
+          LnHash               s -> fmt_ln  2 "Hash:"          s
+          LnCopiesHeader         -> fmt_ln  2 "Copies:"        ""
+          LnCopy               s -> fmt_ln_ 4                  s
 
     hdr     = printf "%s: %s%s -- %s" nm sts ev cmt
         where

@@ -13,6 +13,7 @@ module Data.KeyStore.KS
     , e2ks
     , run_
     , randomBytes
+    , currentTime
     , fyi
     , btw
     , catchKS
@@ -40,6 +41,7 @@ import           Crypto.PubKey.RSA
 import qualified Data.Map                       as Map
 import qualified Data.ByteString                as B
 import           Data.Typeable
+import           Data.Time
 import           Control.Applicative
 import           Control.Monad.RWS.Strict
 import qualified Control.Monad.Error            as E
@@ -52,7 +54,8 @@ newtype KS a = KS { _KS :: E.ErrorT Reason (RWS Ctx [LogEntry] State) a }
 
 data Ctx
     = Ctx
-        { ctx_store    :: FilePath
+        { ctx_now      :: UTCTime
+        , ctx_store    :: FilePath
         , ctx_settings :: Settings
         }
     deriving (Typeable,Show)
@@ -86,7 +89,7 @@ withKey nm p =
 
 trun :: KS a -> a
 trun p =
-    case run_ (Ctx "keystore.json" defaultSettings) s p of
+    case run_ (Ctx u "keystore.json" defaultSettings) s p of
       (Left  e,_,_) -> error $ show e
       (Right x,_,_) -> x
   where
@@ -94,6 +97,8 @@ trun p =
             { st_cprng    = testCPRNG
             , st_keystore = emptyKeyStore $ defaultConfiguration defaultSettings
             }
+
+    u = read "2014-01-01 00:00:00"
 
 e2io :: E a -> IO a
 e2io = either throwIO return
@@ -106,6 +111,9 @@ run_ c s p = runRWS (E.runErrorT (_KS p)) c s
 
 randomBytes :: Octets -> (B.ByteString->a) -> KS a
 randomBytes (Octets sz) k = k <$> randomKS (generateCPRNG sz)
+
+currentTime :: KS UTCTime
+currentTime = ctx_now <$> KS ask
 
 fyi :: String -> KS ()
 fyi msg = KS $ tell [LogEntry False msg]

@@ -28,7 +28,7 @@ data SubCommand
     | RmvTrigger      TriggerID
     | Create          Name Comment Identity (Maybe EnvVar) (Maybe FilePath) [Safeguard]
     | CreateKeyPair   Name Comment Identity                                 [Safeguard]
-    | Secure          Name                        (Maybe FilePath) [Safeguard]
+    | Secure          Name                                 (Maybe FilePath) [Safeguard]
     | List
     | Info           [Name]
     | ShowIdentity    Bool Name

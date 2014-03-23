@@ -60,7 +60,7 @@ encodePacket (MagicWord mw_bs) sg bs =
 
 decodePacket :: MagicWord -> B.ByteString -> E (Safeguard,B.ByteString)
 decodePacket (MagicWord mw_bs) bs = run bs $
- do mw_bs' <- splitBP (Octets $ B.length bs)
+ do mw_bs' <- splitBP (Octets $ B.length mw_bs)
     case mw_bs==mw_bs' of
       True  -> return ()
       False -> errorBP "bad magic word"

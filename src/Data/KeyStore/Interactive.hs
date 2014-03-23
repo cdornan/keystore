@@ -283,7 +283,7 @@ verify ic m_fp s_fp =
 verify_ :: IC -> B.ByteString -> B.ByteString -> IO Bool
 verify_ ic m_bs s_bs =
     run ic $ KS.verifyWithRSAKey (ClearText       $ Binary m_bs)
-                              (SignaturePacket $ Binary s_bs)
+                                 (SignaturePacket $ Binary s_bs)
 
 run :: IC -> KS a -> IO a
 run ic p =

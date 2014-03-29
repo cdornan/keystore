@@ -1,7 +1,4 @@
 :set -isrc -Wall
-:set -hide-package monads-tf 
-:set -hide-package asn1-data
-:set -hide-package regex-compat
-:seti -XOverloadedStrings
+:set -hide-package monads-tf
 
-:set -hide-package crypto-api
+:seti -XOverloadedStrings

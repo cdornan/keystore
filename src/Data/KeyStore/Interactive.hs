@@ -13,7 +13,6 @@ module Data.KeyStore.Interactive
     , defaultCtxParams
     , instanceCtx
     , instanceCtx_
-    , debugCtx
     , newKeyStore
     , listSettings
     , settings
@@ -53,20 +52,10 @@ module Data.KeyStore.Interactive
     , verify_
     , run
     ) where
-{-
-    ( module Data.KeyStore.Interactive
-    , readSettings
-    , CtxParams(..)
-    , defaultSettingsFilePath
-    , defaultKeyStoreFilePath
-    , defaultCtxParams
-    ) where
--}
 
 import           Data.KeyStore.IO
 import qualified Data.KeyStore.KeyStore         as KS
 import qualified Data.KeyStore.Crypto           as C
-import           Data.KeyStore.Opt
 import           Data.KeyStore.KS
 import           Data.KeyStore.Types
 import           Data.API.Types
@@ -93,9 +82,6 @@ instanceCtx cp =
 
 instanceCtx_ :: CtxParams -> IC
 instanceCtx_ cp = IC cp Nothing
-
-debugCtx :: IC -> Bool -> IO ()
-debugCtx ic = adjust_stgs ic . setSettingsOpt opt__debug_enabled
 
 newKeyStore :: FilePath -> Settings -> IO ()
 newKeyStore str_fp stgs =
@@ -311,11 +297,6 @@ backup_env ctx st0 =
     return st'
   where
     (e,st',les') = run_ ctx st0 KS.backupKeys
-
-adjust_stgs :: IC -> (Settings->Settings) -> IO ()
-adjust_stgs ic f =
- do (ctx,st) <- get ic
-    put ic ctx { ctx_settings = f $ ctx_settings ctx } st
 
 data IC =
     IC  { ic_ctx_params :: CtxParams

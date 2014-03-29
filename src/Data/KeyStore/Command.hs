@@ -22,7 +22,8 @@ data Command =
         }
 
 data SubCommand
-    = Initialise      FilePath
+    = Version
+    | Initialise      FilePath
     | UpdateSettings  FilePath
     | AddTrigger      TriggerID Pattern FilePath
     | RmvTrigger      TriggerID
@@ -50,12 +51,18 @@ parseCommand :: IO Command
 parseCommand = execParser opts
   where
     opts =
-        h_info
-            (p_command)
+        info (helper <*> (p_version <|> p_command))
             (   fullDesc
              <> progDesc "for storing secret things"
              <> header "ks - key store management"
              <> footer "'ks COMMAND --help' to get help on each command")
+
+p_version :: Parser Command
+p_version =
+    flag' (Command Nothing False Version)
+        $  long "version"
+        <> help "display the version"
+
 
 p_command :: Parser Command
 p_command =
@@ -81,7 +88,8 @@ p_debug_flg =
 p_sub_command :: Parser SubCommand
 p_sub_command =
     subparser
-     $  command "initialise"        pi_initialise
+     $  command "version"           pi_version
+     <> command "initialise"        pi_initialise
      <> command "update-settings"   pi_update_settings
      <> command "add-trigger"       pi_add_trigger
      <> command "rmv-trigger"       pi_rmv_trigger
@@ -104,7 +112,8 @@ p_sub_command =
      <> command "verify"            pi_verify
      <> command "delete"            pi_delete
 
-pi_initialise
+pi_version
+    , pi_initialise
     , pi_update_settings
     , pi_add_trigger
     , pi_rmv_trigger
@@ -126,6 +135,11 @@ pi_initialise
     , pi_sign
     , pi_verify
     , pi_delete :: ParserInfo SubCommand
+
+pi_version =
+    h_info
+        (pure Version)
+        (progDesc "initialise a new key store")
 
 pi_initialise =
     h_info

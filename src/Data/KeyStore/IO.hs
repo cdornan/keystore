@@ -37,6 +37,7 @@ import           Control.Applicative
 import           System.Environment
 import           System.Directory
 import           System.FilePath
+import           System.IO
 import           Safe
 
 
@@ -90,10 +91,7 @@ determineCtx CtxParams{..} =
                 { st_keystore = ks
                 , st_cprng    = g
                 }
-        sdbg =
-          case cp_debug of
-            True  -> setSettingsOpt opt__debug_enabled True
-            False -> id
+        sdbg = setSettingsOpt opt__debug_enabled cp_debug
         stg  = sdbg $ configurationSettings $ _ks_config ks
         ctx  = ctx0 { ctx_settings = stg }
     return (ctx,st)
@@ -134,13 +132,13 @@ scanEnv' now ks = s_e <$> mapM lu k_evs
           False -> s_e'' key $ B.pack sv
           True  ->
             case B64.decode $ B.pack sv of
-              Left  _  -> fyi $ _name(_key_name key) ++ ": " ++ T.unpack enm ++ ": base-64 decode failure"
+              Left  _  -> putStrKS $ _name(_key_name key) ++ ": " ++ T.unpack enm ++ ": base-64 decode failure"
               Right bs -> s_e'' key bs
       where
         EnvVar enm = fromJustNote "scan_env" $ _key_env_var key
 
     s_e'' Key{..} bs =
-         do fyi $ _name _key_name ++ " loaded\n"
+         do btw $ _name _key_name ++ " loaded\n"
             _ <- rememberKey _key_name (ClearText $ Binary bs)
             return ()
 
@@ -181,11 +179,13 @@ ioE p = p >>= either X.throw return
 logit :: Ctx -> LogEntry -> IO ()
 logit ctx LogEntry{..} =
     case dbg || not le_debug of
-      True  -> putStr $ pfx ++ le_message
+      True  -> hPutStr h $ pfx ++ le_message
       False -> return ()
   where
     dbg = getSettingsOpt opt__debug_enabled $ ctx_settings ctx
-    pfx = if le_debug then "(log) " else ""
+    pfx = if le_debug then "(debug) " else ""
+    h   = if le_debug then stderr     else stdout
+
 lu_path :: FilePath -> [FilePath] -> IO FilePath -> IO FilePath
 lu_path _  []       nope = nope
 lu_path fp (dp:dps) nope =

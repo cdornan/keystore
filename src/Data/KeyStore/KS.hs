@@ -14,7 +14,7 @@ module Data.KeyStore.KS
     , run_
     , randomBytes
     , currentTime
-    , fyi
+    , putStrKS
     , btw
     , catchKS
     , errorKS
@@ -115,8 +115,8 @@ randomBytes (Octets sz) k = k <$> randomKS (generateCPRNG sz)
 currentTime :: KS UTCTime
 currentTime = ctx_now <$> KS ask
 
-fyi :: String -> KS ()
-fyi msg = KS $ tell [LogEntry False msg]
+putStrKS :: String -> KS ()
+putStrKS msg = KS $ tell [LogEntry False msg]
 
 btw :: String -> KS ()
 btw msg = KS $ tell [LogEntry True msg]

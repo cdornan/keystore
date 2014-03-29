@@ -11,6 +11,10 @@ import           Control.Monad
 import           System.Exit
 
 
+version :: String
+version = "0.0.0.6"
+
+
 cli :: IO ()
 cli = parseCommand >>= command
 
@@ -18,10 +22,13 @@ command :: Command -> IO ()
 command Command{..} =
  do ic <-
       case cmd_sub of
+        Version     ->
+             return $ I.instanceCtx_ cp
         Initialise _ ->
              return $ I.instanceCtx_ cp
         _ -> I.instanceCtx cp
     case cmd_sub of
+      Version                                   ->      putStrLn version
       Initialise               fp               ->      I.newKeyStore                  fp defaultSettings
       UpdateSettings           fp               ->      I.updateSettings   ic          fp
       AddTrigger         ti pt fp               ->      I.addTrigger       ic    ti pt fp

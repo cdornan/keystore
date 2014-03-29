@@ -273,13 +273,13 @@ list :: KS ()
 list =
  do nms <- map _key_name <$> getKeys
     keys <- mapM loadKey $ sort nms
-    fyi $ concat $ map (list_key False) keys
+    putStrKS $ concat $ map (list_key False) keys
 
 -- | Print out the information of a particular key.
 info :: Name -> KS ()
 info nm =
  do key <- loadKey nm
-    fyi $ list_key True key
+    putStrKS $ list_key True key
 
 data Line
     = LnHeader        String

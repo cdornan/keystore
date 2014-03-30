@@ -41,12 +41,14 @@ import           System.IO
 import           Safe
 
 
+-- | The parameters used to set up a KeyStore session.
 data CtxParams
     = CtxParams
-        { cp_store  :: Maybe FilePath
-        , cp_debug  :: Bool
+        { cp_store  :: Maybe FilePath     -- ^ location of any explictlt specified keystore file
+        , cp_debug  :: Bool               -- ^ whether debug output has been enabled or noe
         }
 
+-- | Suitable default 'CtxParams'.
 defaultCtxParams :: CtxParams
 defaultCtxParams =
     CtxParams
@@ -54,15 +56,20 @@ defaultCtxParams =
         , cp_debug  = False
         }
 
+-- | The default place for keystore settings (settings).
 defaultSettingsFilePath :: FilePath
 defaultSettingsFilePath = settingsFilePath "settings"
 
+-- | Add the standard file extension to a base name (.json).
 settingsFilePath :: String -> FilePath
 settingsFilePath base = base ++ ".json"
 
+
+-- | The default file for a keystore (keystore.json).
 defaultKeyStoreFilePath :: FilePath
 defaultKeyStoreFilePath = "keystore.json"
 
+-- | Determine the 'Ctx' and keystore 'State' from 'CtxParams'
 determineCtx :: CtxParams -> IO (Ctx,State)
 determineCtx CtxParams{..} =
  do str_fp_ <-
@@ -96,6 +103,7 @@ determineCtx CtxParams{..} =
         ctx  = ctx0 { ctx_settings = stg }
     return (ctx,st)
 
+-- | Set up the keystore state.
 establishState :: Ctx -> IO State
 establishState ctx =
  do ks  <- readKeyStore ctx
@@ -160,6 +168,7 @@ scanEnv' now ks = s_e <$> mapM lu k_evs
             , st_keystore = ks
             }
 
+-- | Read the JSON-encoded KeyStore settings from the named file.
 readSettings :: FilePath -> IO Settings
 readSettings fp =
  do lbs <- LBS.readFile fp

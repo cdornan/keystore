@@ -1,12 +1,10 @@
-OD = dist/build/certstore
-HC = mkdir -p $(OD); ghc -XHaskell2010 --make -O1 -Werror -outputdir build -Wall
 
 
-all: keystore
+all: keystore markdown
 
 
 keystore: .prep
-	cabal build
+	cabal install
 
 .prep: keystore.manifest
 	hub load    keystore <keystore.manifest
@@ -18,6 +16,9 @@ keystore: .prep
 
 save-hub:
 	hub save >keystore.manifest
+
+markdown:
+	runghc -isrc scripts/markdown.hs
 
 clean:
 	cabal clean

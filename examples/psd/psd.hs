@@ -1,12 +1,8 @@
 {-# LANGUAGE OverloadedStrings          #-}
 
-module PSD
-    ( module PSD
-    , module Data.KeyStore.Interactive
-    ) where
+module Main where
 
-import           Data.KeyStore.Interactive
-import           Data.KeyStore.Types
+import           Data.KeyStore
 import qualified Data.Text                      as T
 import qualified Data.ByteString.Char8          as B
 import           System.Directory
@@ -35,8 +31,8 @@ export KEY_pw_prodn=pw_prodn
 ---------------------------}
 
 
-psd :: IO ()
-psd =
+main :: IO ()
+main =
  do ok <- doesFileExist ex_ks
     case ok of
       True  ->

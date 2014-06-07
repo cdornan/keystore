@@ -41,7 +41,6 @@ import           Data.Maybe
 import           Data.List
 import           Data.Time
 import           Text.Printf
-import           Crypto.PubKey.RSA
 import           Control.Applicative
 import           Control.Lens
 import           Control.Monad

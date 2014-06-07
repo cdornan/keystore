@@ -16,6 +16,9 @@
 {-# LANGUAGE TypeSynonymInstances       #-}
 {-# LANGUAGE FlexibleInstances          #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
+{-# OPTIONS_GHC -fno-warn-unused-binds  #-}
+
+
 
 -- | The KeyStore and Associated Types
 --
@@ -28,13 +31,13 @@ module Data.KeyStore.Types
     , ks_keymap
     , ks_config
     , Configuration(..)
-    , TriggerMap(..)
+    , TriggerMap
     , Trigger(..)
     , Settings(..)
     , cfg_settings
     , cfg_triggers
     , TextJsonAssoc(..)
-    , KeyMap(..)
+    , KeyMap
     , NameKeyAssoc(..)
     , Key(..)
     , key_name
@@ -50,9 +53,8 @@ module Data.KeyStore.Types
     , key_created_at
     , Hash(..)
     , HashDescription(..)
-    , EncrypedCopyMap(..)
+    , EncrypedCopyMap
     , EncrypedCopy(..)
-    , Safeguard(..)
     , EncrypedCopyData(..)
     , RSASecretData(..)
     , AESSecretData(..)
@@ -67,7 +69,6 @@ module Data.KeyStore.Types
     , Pattern(..)
     , Iterations(..)
     , Octets(..)
-    , Name(..)
     , Identity(..)
     , SettingID(..)
     , TriggerID(..)

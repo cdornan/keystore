@@ -16,9 +16,10 @@ import qualified Data.Text              as T
 
 data Command =
     Command
-        { cmd_store   :: Maybe FilePath
-        , cmd_debug   :: Bool
-        , cmd_sub     :: SubCommand
+        { cmd_store    :: Maybe FilePath
+        , cmd_debug    :: Bool
+        , cmd_readonly :: Bool
+        , cmd_sub      :: SubCommand
         }
 
 data SubCommand
@@ -59,7 +60,7 @@ parseCommand = execParser opts
 
 p_version :: Parser Command
 p_version =
-    flag' (Command Nothing False Version)
+    flag' (Command Nothing False False Version)
         $  long "version"
         <> help "display the version"
 
@@ -69,6 +70,7 @@ p_command =
     Command
         <$> optional p_store
         <*> p_debug_flg
+        <*> p_readonly_flg
         <*> p_sub_command
 
 p_store :: Parser FilePath
@@ -84,6 +86,13 @@ p_debug_flg =
         $  long  "debug"
         <> short 'd'
         <> help  "enable debug logging"
+
+p_readonly_flg :: Parser Bool
+p_readonly_flg =
+    switch
+        $  long  "readonly"
+        <> short 'r'
+        <> help  "disable updating of keystore"
 
 p_sub_command :: Parser SubCommand
 p_sub_command =

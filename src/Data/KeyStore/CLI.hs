@@ -52,8 +52,9 @@ command Command{..} =
   where
     pr p = p >>= B.putStrLn
     cp   = CtxParams
-                { cp_store  = cmd_store
-                , cp_debug  = cmd_debug
+                { cp_store    = cmd_store
+                , cp_debug    = cmd_debug
+                , cp_readonly = cmd_readonly
                 }
 
 create :: IC

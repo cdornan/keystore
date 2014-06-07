@@ -44,16 +44,18 @@ import           Safe
 -- | The parameters used to set up a KeyStore session.
 data CtxParams
     = CtxParams
-        { cp_store  :: Maybe FilePath     -- ^ location of any explictlt specified keystore file
-        , cp_debug  :: Bool               -- ^ whether debug output has been enabled or noe
+        { cp_store    :: Maybe FilePath   -- ^ location of any explictlt specified keystore file
+        , cp_debug    :: Bool             -- ^ whether debug output has been enabled or noe
+        , cp_readonly :: Bool             -- ^ True => do not update keystore
         }
 
 -- | Suitable default 'CtxParams'.
 defaultCtxParams :: CtxParams
 defaultCtxParams =
     CtxParams
-        { cp_store  = Nothing
-        , cp_debug  = False
+        { cp_store    = Nothing
+        , cp_debug    = False
+        , cp_readonly = False
         }
 
 -- | The default place for keystore settings (settings).

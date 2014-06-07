@@ -11,7 +11,7 @@ import           Control.Applicative
 
 
 ic :: IC
-ic = instanceCtx_ $ CtxParams (Just ex_ks) True
+ic = instanceCtx_ $ CtxParams (Just ex_ks) True True
 
 ex_dir :: FilePath
 ex_dir = "examples/psd"

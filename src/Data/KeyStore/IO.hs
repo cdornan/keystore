@@ -48,6 +48,7 @@ data CtxParams
         , cp_debug    :: Bool             -- ^ whether debug output has been enabled or noe
         , cp_readonly :: Bool             -- ^ True => do not update keystore
         }
+    deriving (Show)
 
 -- | Suitable default 'CtxParams'.
 defaultCtxParams :: CtxParams

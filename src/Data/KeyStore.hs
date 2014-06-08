@@ -10,7 +10,7 @@
 module Data.KeyStore
     ( readSettings
     , CtxParams(..)
-    , IC
+    , IC(..)
     , module Data.KeyStore.Types
     , defaultSettingsFilePath
     , settingsFilePath
@@ -76,6 +76,7 @@ import           Text.Printf
 import           Control.Applicative
 import qualified Control.Exception              as X
 import           Control.Lens
+import           Control.Monad
 import           System.IO
 import           System.Locale
 
@@ -378,7 +379,8 @@ get IC{..} =
 put :: IC -> Ctx -> State -> IO ()
 put IC{..} ctx st =
  do maybe (return ()) (flip writeIORef (ctx,st)) ic_cache
-    LBS.writeFile (ctx_store ctx) $ KS.keyStoreBytes $ st_keystore st
+    when (not $ cp_readonly ic_ctx_params) $
+        LBS.writeFile (ctx_store ctx) $ KS.keyStoreBytes $ st_keystore st
 
 report :: String -> IO ()
 report = hPutStrLn stderr

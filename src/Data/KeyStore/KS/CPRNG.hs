@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 
-module Data.KeyStore.CPRNG
+module Data.KeyStore.KS.CPRNG
     ( CPRNG
     , newCPRNG
     , testCPRNG

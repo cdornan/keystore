@@ -1,6 +1,6 @@
 {-# LANGUAGE RecordWildCards            #-}
 
-module Data.KeyStore.Configuration where
+module Data.KeyStore.KS.Configuration where
 
 import           Data.KeyStore.Types
 import           Data.Monoid

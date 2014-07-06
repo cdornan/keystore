@@ -1,4 +1,4 @@
-:set -isrc -Wall
+:set -isrc -iexamples/deploy -Wall
 :set -hide-package monads-tf
 
 :seti -XOverloadedStrings

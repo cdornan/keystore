@@ -1,16 +1,16 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Data.KeyStore.Packet
+module Data.KeyStore.KS.Packet
     ( encocdeEncryptionPacket
-    , decocdeEncryptionPacket
+    , decocdeEncryptionPacketE
     , encocdeSignaturePacket
-    , decocdeSignaturePacket
+    , decocdeSignaturePacketE
     -- debugging
     , testBP
     ) where
 
-import           Data.KeyStore.KS
+import           Data.KeyStore.KS.KS
 import           Data.KeyStore.Types
 import           Data.API.Types
 import qualified Data.ByteString                as B
@@ -19,6 +19,8 @@ import qualified Data.ByteString.Lazy.Char8     as LBS
 import           Data.ByteString.Lazy.Builder
 import           Data.Word
 import           Data.Bits
+import           Data.Char
+import           Text.Printf
 import           Control.Applicative
 import           Control.Monad.RWS.Strict
 import qualified Control.Monad.Error            as E
@@ -36,9 +38,9 @@ encocdeEncryptionPacket sg rsb =
     EncryptionPacket $ Binary $
         encodePacket encryption_magic_word sg $ _Binary $ _RSASecretBytes rsb
 
-decocdeEncryptionPacket :: EncryptionPacket -> E (Safeguard,RSASecretBytes)
-decocdeEncryptionPacket ep =
- do (sg,bs) <- decodePacket encryption_magic_word $ _Binary $ _EncryptionPacket ep
+decocdeEncryptionPacketE :: EncryptionPacket -> E (Safeguard,RSASecretBytes)
+decocdeEncryptionPacketE ep =
+ do (sg,bs) <- decodePacketE encryption_magic_word $ _Binary $ _EncryptionPacket ep
     return (sg,RSASecretBytes $ Binary bs)
 
 encocdeSignaturePacket :: Safeguard -> RSASignature -> SignaturePacket
@@ -46,9 +48,9 @@ encocdeSignaturePacket sg rs =
     SignaturePacket $ Binary $
         encodePacket signature_magic_word sg $ _Binary $ _RSASignature rs
 
-decocdeSignaturePacket :: SignaturePacket -> E (Safeguard,RSASignature)
-decocdeSignaturePacket sp =
- do (sg,bs) <- decodePacket signature_magic_word $ _Binary $ _SignaturePacket sp
+decocdeSignaturePacketE :: SignaturePacket -> E (Safeguard,RSASignature)
+decocdeSignaturePacketE sp =
+ do (sg,bs) <- decodePacketE signature_magic_word $ _Binary $ _SignaturePacket sp
     return (sg,RSASignature $ Binary bs)
 
 
@@ -58,12 +60,12 @@ encodePacket (MagicWord mw_bs) sg bs =
     encodeSafeguard sg $
                     bs
 
-decodePacket :: MagicWord -> B.ByteString -> E (Safeguard,B.ByteString)
-decodePacket (MagicWord mw_bs) bs = run bs $
+decodePacketE :: MagicWord -> B.ByteString -> E (Safeguard,B.ByteString)
+decodePacketE (MagicWord mw_bs) bs = run bs $
  do mw_bs' <- splitBP (Octets $ B.length mw_bs)
     case mw_bs==mw_bs' of
       True  -> return ()
-      False -> errorBP "bad magic word"
+      False -> errorBP $ printf "bad magic word: %s/=%s" (BC.unpack $ to_hex mw_bs') (BC.unpack $ to_hex mw_bs)
     sg   <- decodeSafeguard
     b_bs <- remainingBP
     return (sg,b_bs)
@@ -153,3 +155,12 @@ peek_remainingBP = BP get
 
 modifyBP :: (B.ByteString->B.ByteString) -> BP ()
 modifyBP upd = BP $ modify upd
+
+-- hexify a ByteString
+
+to_hex :: B.ByteString -> B.ByteString
+to_hex = BC.pack . foldr f "" . BC.unpack
+  where
+    f c t = intToDigit (n `div` 16) : intToDigit (n `mod` 16) : t
+          where
+            n = ord c

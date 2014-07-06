@@ -68,7 +68,7 @@ parseSafeguard s =
       _   | all chk s -> chk'  $ safeguard $ map Name $ words $ map tr s
           | otherwise -> oops
   where
-    chk c   = c==',' || is_nm_char c
+    chk  c  = c==',' || is_nm_char c
 
     chk' sg =
         case isWildSafeguard sg of

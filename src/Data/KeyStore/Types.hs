@@ -128,6 +128,9 @@ deriving instance Num Iterations
 deriving instance Num Octets
 
 
+-- | Keystore session context, created at the start of a session and passed
+-- to the keystore access functions.
+
 data Pattern =
     Pattern
       { _pat_string :: String

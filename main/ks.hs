@@ -1,4 +1,4 @@
-import Data.KeyStore.CLI
+import Data.KeyStore
 
 main :: IO ()
 main = cli

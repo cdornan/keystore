@@ -1,107 +1,140 @@
 {-# LANGUAGE OverloadedStrings          #-}
 
-module Data.KeyStore.Command
-    ( Command(..)
-    , SubCommand(..)
-    , parseCommand
+module Data.KeyStore.CLI.Command
+    ( CLI(..)
+    , Command(..)
+    , parseCLI
+    , parseCLI'
+    , cliInfo
+    , cliParser
+    , paramsParser
+    , runParse
     )
     where
 
-import           Options.Applicative
+import           Data.KeyStore.KS.Opt
 import           Data.KeyStore.Types
+import           Data.KeyStore.IO.IC
 import           Data.String
 import           Text.Regex
 import qualified Data.Text              as T
+import           Options.Applicative
+import           System.Environment
+import           System.Exit
+import           System.IO
 
 
-data Command =
-    Command
-        { cmd_store    :: Maybe FilePath
-        , cmd_debug    :: Bool
-        , cmd_readonly :: Bool
-        , cmd_sub      :: SubCommand
+data CLI =
+    CLI
+        { cli_params    :: CtxParams
+        , cli_command   :: Command
         }
-
-data SubCommand
-    = Version
-    | Initialise      FilePath
-    | UpdateSettings  FilePath
-    | AddTrigger      TriggerID Pattern FilePath
-    | RmvTrigger      TriggerID
-    | Create          Name Comment Identity (Maybe EnvVar) (Maybe FilePath) [Safeguard]
-    | CreateKeyPair   Name Comment Identity                                 [Safeguard]
-    | Secure          Name                                 (Maybe FilePath) [Safeguard]
-    | List
-    | Info           [Name]
-    | ShowIdentity    Bool Name
-    | ShowComment     Bool Name
-    | ShowDate        Bool Name
-    | ShowHash        Bool Name
-    | ShowHashComment Bool Name
-    | ShowHashSalt    Bool Name
-    | ShowPublic      Bool Name
-    | ShowSecret Bool Name
-    | Encrypt         Name    FilePath FilePath
-    | Decrypt                 FilePath FilePath
-    | Sign            Name    FilePath FilePath
-    | Verify                  FilePath FilePath
-    | Delete         [Name]
     deriving (Show)
 
-parseCommand :: IO Command
-parseCommand = execParser opts
-  where
-    opts =
-        info (helper <*> (p_version <|> p_command))
-            (   fullDesc
-             <> progDesc "for storing secret things"
-             <> header "ks - key store management"
-             <> footer "'ks COMMAND --help' to get help on each command")
+data Command
+    = Version
+    | Keystore
+    | Initialise        FilePath
+    | UpdateSettings    FilePath
+    | ListSettings
+    | ListSettingOpts  (Maybe OptEnum)
+    | AddTrigger        TriggerID Pattern FilePath
+    | RmvTrigger        TriggerID
+    | ListTriggers
+    | Create            Name Comment Identity (Maybe EnvVar) (Maybe FilePath) [Safeguard]
+    | CreateKeyPair     Name Comment Identity                                 [Safeguard]
+    | Secure            Name                                 (Maybe FilePath) [Safeguard]
+    | List
+    | Info             [Name]
+    | ShowIdentity      Bool Name
+    | ShowComment       Bool Name
+    | ShowDate          Bool Name
+    | ShowHash          Bool Name
+    | ShowHashComment   Bool Name
+    | ShowHashSalt      Bool Name
+    | ShowPublic        Bool Name
+    | ShowSecret   Bool Name
+    | Encrypt           Name    FilePath FilePath
+    | Decrypt                   FilePath FilePath
+    | Sign              Name    FilePath FilePath
+    | Verify                    FilePath FilePath
+    | Delete           [Name]
+    deriving (Show)
 
-p_version :: Parser Command
-p_version =
-    flag' (Command Nothing False False Version)
-        $  long "version"
-        <> help "display the version"
+parseCLI :: IO CLI
+parseCLI = getArgs >>= parseCLI'
 
+parseCLI' :: [String] -> IO CLI
+parseCLI' = runParse cliInfo
 
-p_command :: Parser Command
-p_command =
-    Command
-        <$> optional p_store
-        <*> p_debug_flg
-        <*> p_readonly_flg
-        <*> p_sub_command
+cliInfo :: ParserInfo CLI
+cliInfo =
+    info (helper <*> cliParser)
+        (   fullDesc
+         <> progDesc "for storing secret things"
+         <> header "ks - key store management"
+         <> footer "'ks COMMAND --help' to get help on each command")
+
+cliParser :: Parser CLI
+cliParser =
+    CLI
+      <$> paramsParser
+      <*> p_command
+
+paramsParser :: Parser CtxParams
+paramsParser =
+    CtxParams
+      <$> optional p_store
+      <*> optional (p_debug_flg    <|> p_no_debug_flg )
+      <*> optional (p_readonly_flg <|> p_writeback_flg)
 
 p_store :: Parser FilePath
 p_store =
     strOption
-        $  long "store"
-        <> metavar "FILE"
-        <> help "the file containing the key store"
+      $  long "store"
+      <> metavar "FILE"
+      <> help "the file containing the key store"
 
 p_debug_flg :: Parser Bool
 p_debug_flg =
-    switch
-        $  long  "debug"
-        <> short 'd'
-        <> help  "enable debug logging"
+    flag' True
+      $  long  "debug"
+      <> short 'd'
+      <> help  "enable debug logging"
+
+p_no_debug_flg :: Parser Bool
+p_no_debug_flg =
+    flag' False
+      $  long  "no-debug"
+      <> short 'q'
+      <> help  "disable debug logging"
 
 p_readonly_flg :: Parser Bool
 p_readonly_flg =
-    switch
-        $  long  "readonly"
-        <> short 'r'
-        <> help  "disable updating of keystore"
+    flag' True
+      $  long  "readonly"
+      <> short 'r'
+      <> help  "disable updating of keystore"
 
-p_sub_command :: Parser SubCommand
-p_sub_command =
+p_writeback_flg :: Parser Bool
+p_writeback_flg =
+    flag' False
+      $  long  "writeback"
+      <> short 'w'
+      <> help  "write back the keystore"
+
+p_command :: Parser Command
+p_command =
     subparser
      $  command "version"           pi_version
+     <> command "keystore"          pi_keystore
      <> command "initialise"        pi_initialise
      <> command "update-settings"   pi_update_settings
+     <> command "list-settings"     pi_list_settings
+     <> command "list-setting-opts" pi_list_setting_opts
      <> command "add-trigger"       pi_add_trigger
      <> command "rmv-trigger"       pi_rmv_trigger
+     <> command "list-triggers"     pi_list_triggers
      <> command "create"            pi_create
      <> command "create-key-pair"   pi_create_key_pair
      <> command "secure"            pi_secure
@@ -122,10 +155,14 @@ p_sub_command =
      <> command "delete"            pi_delete
 
 pi_version
+    , pi_keystore
     , pi_initialise
     , pi_update_settings
+    , pi_list_settings
+    , pi_list_setting_opts
     , pi_add_trigger
     , pi_rmv_trigger
+    , pi_list_triggers
     , pi_create
     , pi_create_key_pair
     , pi_secure
@@ -143,12 +180,17 @@ pi_version
     , pi_decrypt
     , pi_sign
     , pi_verify
-    , pi_delete :: ParserInfo SubCommand
+    , pi_delete :: ParserInfo Command
 
 pi_version =
     h_info
-        (pure Version)
-        (progDesc "initialise a new key store")
+        (helper <*> pure Version)
+        (progDesc "report the version of this package")
+
+pi_keystore =
+    h_info
+        (helper <*> pure Keystore)
+        (progDesc "list the details of the keystore")
 
 pi_initialise =
     h_info
@@ -162,7 +204,20 @@ pi_update_settings =
         (helper <*>
             (UpdateSettings
                 <$> p_file "JSON-SETTINGS-FILE"  "new settings"))
-        (progDesc "update settings")
+        (progDesc "update the keystore settings")
+
+pi_list_settings =
+    h_info
+        (helper <*>
+            (pure ListSettings))
+        (progDesc "dump the keystore settings on stdout")
+
+pi_list_setting_opts =
+    h_info
+        (helper <*>
+            (ListSettingOpts
+                <$> optional p_opt))
+        (progDesc "list the settings options")
 
 pi_add_trigger =
     h_info
@@ -178,6 +233,12 @@ pi_rmv_trigger =
         (helper <*>
             (RmvTrigger
                 <$> p_trigger_id))
+        (progDesc "remove trigger")
+
+pi_list_triggers =
+    h_info
+        (helper <*>
+            (pure ListTriggers))
         (progDesc "remove trigger")
 
 pi_create =
@@ -363,9 +424,9 @@ p_safeguard =
 p_key_text :: Parser FilePath
 p_key_text =
     strOption
-        $  long "key-file"
+        $  long    "key-file"
         <> metavar "FILE"
-        <> help "secret key file"
+        <> help    "secret key file"
 
 p_file :: String -> String -> Parser FilePath
 p_file mtv hlp =
@@ -379,5 +440,28 @@ p_armour =
         $ long "base-64"
         <> help "base-64 encode the result"
 
+p_opt :: Parser OptEnum
+p_opt =
+    argument (parseOpt . T.pack)
+        $  metavar "SETTING-OPT"
+        <> help    "name of a keystore setting option"
+
 h_info :: Parser a -> InfoMod a -> ParserInfo a
 h_info pr = info (helper <*> pr)
+
+runParse :: ParserInfo a -> [String] -> IO a
+runParse pinfo args =
+  case execParserPure (prefs idm) pinfo args of
+    Success a -> return a
+    Failure failure -> do
+      progn <- getProgName
+      let (msg, exit) = execFailure failure progn
+      case exit of
+        ExitSuccess -> putStrLn msg
+        _           -> hPutStrLn stderr msg
+      exitWith exit
+    CompletionInvoked compl -> do
+      progn <- getProgName
+      msg   <- execCompletion compl progn
+      putStr msg
+      exitWith ExitSuccess

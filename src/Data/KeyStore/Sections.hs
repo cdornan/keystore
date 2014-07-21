@@ -144,13 +144,14 @@ retrieve :: Sections h s k => IC -> h -> k -> IO (Either RetrieveDg [Key])
 retrieve ic h k = either (return . Left) (\nm->Right <$> locateKeys ic nm) ei_nm
   where
     ei_nm = case keyIsHostIndexed k of
-      Nothing -> maybe (Left RDG_key_not_reachable) Right $
-                    listToMaybe
-                        [ key_nme Nothing s_ k | s_ <- lower_sections s, keyIsInSection k s_ ]
-      Just hp | hp h      -> Right $ key_nme (Just h) s k
+      Nothing             -> ei_nm'   Nothing
+      Just hp | hp h      -> ei_nm' $ Just h
               | otherwise -> Left RDG_no_such_host_key
 
-    s = hostSection h
+    ei_nm' mb_h = maybe (Left RDG_key_not_reachable) Right $
+        listToMaybe [ key_nme mb_h s_ k | s_ <- lower_sections s0, keyIsInSection k s_ ]
+
+    s0 = hostSection h
 
 signKeystore :: Sections h s k => IC -> SECTIONS h s k -> IO B.ByteString
 signKeystore ic scn = B.readFile (the_keystore $ ic_ctx_params ic) >>= sign_ ic (sgn_nme $ signing_key scn)

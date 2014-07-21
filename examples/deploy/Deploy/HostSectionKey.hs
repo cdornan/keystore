@@ -66,6 +66,7 @@ instance Code KeyID where
 
 instance Sections HostID SectionID KeyID where
   hostSection      = host_section
+  hostRSection     = host_resident_section
   sectionType      = section_type
   superSections    = super_sections
   keyIsHostIndexed = key_is_host_indexed
@@ -80,6 +81,15 @@ sections = SECTIONS
 
 host_section :: HostID -> SectionID
 host_section h =
+  case h of
+    H_live_eu    -> S_eu_admin
+    H_staging_eu -> S_eu_staging
+    H_live_us    -> S_us_admin
+    H_staging_us -> S_us_staging
+    H_dev        -> S_dev
+
+host_resident_section :: HostID -> SectionID
+host_resident_section h =
   case h of
     H_live_eu    -> S_eu_deploy
     H_staging_eu -> S_eu_staging

@@ -23,6 +23,7 @@ module Data.KeyStore.IO
     , instanceCtx
     , instanceCtx_
     , newKeyStore
+    , store
     , listSettings
     , settings
     , updateSettings
@@ -111,6 +112,10 @@ instanceCtx cp =
 -- state between calls.
 instanceCtx_ :: CtxParams -> IC
 instanceCtx_ cp = IC cp Nothing
+
+-- | the filepath of the loaded store
+store :: IC -> IO FilePath
+store ic = run ic storeKS
 
 -- | List the JSON settings on stdout.
 listSettings :: IC -> IO ()

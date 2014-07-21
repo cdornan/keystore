@@ -26,6 +26,7 @@ data Command
     | Deploy        (Maybe FilePath) HostID
     | Sign
     | Verify
+    | ListHosts
     | InfoKey       (Maybe KeyID    )
     | InfoSection   (Maybe SectionID)
     | SecretScript
@@ -38,20 +39,20 @@ parseCLI :: IO CLI
 parseCLI = do
   args <- getArgs
   case span is_flg args of
-    (flgs,"ks":args') -> return $ CLI defaultCtxParams $ KS $ flgs++args'
-    _                 -> parseCLI' args
+    (flgs,"ks":args') -> runParse (pi_cli $ p_ks args') flgs
+    _                 -> runParse (pi_cli   p_cli     ) args
 
-parseCLI' :: [String] -> IO CLI
-parseCLI' = runParse cliInfo
-
-cliInfo :: ParserInfo CLI
-cliInfo =
-    h_info p_cli $
+pi_cli :: Parser CLI -> ParserInfo CLI
+pi_cli psr =
+    h_info psr $
         fullDesc   <>
         progDesc "For carrying out deployments from the keystore."
 
+p_ks :: [String] -> Parser CLI
+p_ks args = CLI <$> paramsParser <*> pure (KS args)
+
 p_cli :: Parser CLI
-p_cli = CLI <$> paramsParser <*> p_command
+p_cli     = CLI <$> paramsParser <*> p_command
 
 p_command :: Parser Command
 p_command =
@@ -61,6 +62,7 @@ p_command =
      <> command "deploy"                    pi_deploy
      <> command "sign"                      pi_sign
      <> command "verify"                    pi_verify
+     <> command "list-hosts"                pi_list_hosts
      <> command "info-key"                  pi_info_key
      <> command "info-section"              pi_info_section
      <> command "secret-script"             pi_secret_script
@@ -102,6 +104,12 @@ pi_verify =
     h_info
         (helper <*> (pure Verify))
         (progDesc "verify the keystore")
+
+pi_list_hosts :: ParserInfo Command
+pi_list_hosts =
+    h_info
+        (helper <*> (pure ListHosts))
+        (progDesc "list the hosts")
 
 pi_info_key :: ParserInfo Command
 pi_info_key =

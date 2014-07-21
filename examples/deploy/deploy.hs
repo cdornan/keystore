@@ -13,7 +13,6 @@ import           Data.KeyStore                  as KS
 import qualified Data.ByteString.Char8          as B
 import qualified Data.ByteString.Lazy.Char8     as LBS
 import qualified Data.Text.IO                   as T
-import           System.Directory
 import           System.IO
 import           Control.Applicative
 import           Control.Exception
@@ -29,21 +28,23 @@ main =
     let cp0 = cli_params
         cp  = cp0 { cp_store = cp_store cp0 <|> Just ks_fp }
     case cli_command of
-      Create       -> initialise cp0 no_keys
-      SampleScript -> mapM_ sample_ln [minBound..maxBound]
-      KS args      -> KS.cli' Nothing args
-      _          ->
-         do ic <- load cp
+      Create       -> initialise cp no_keys
+      ListHosts    -> mapM_ (putStrLn . encode) $ [minBound..maxBound :: HostID]
+      SampleScript -> mapM_  sample_ln            [minBound..maxBound]
+      KS args      -> KS.cli' (Just cp) args
+      _            ->
+         do ic <- instanceCtx cp
             let ic_ro = ic { ic_ctx_params = cp {cp_readonly = cp_readonly cp <|> Just True} }
             case cli_command of
               Sign -> return ()
               _    -> verify_ks True ic_ro
             case cli_command of
               Create                      -> error "main: Initialise"
-              Rotate          mbh mbs mbk -> rotate ic    $ key_prededicate mbh mbs mbk
-              Deploy          mb hst      -> deploy ic_ro hst                         >>= write mb
+              Rotate          mbh mbs mbk -> rotate  ic    $ key_prededicate mbh mbs mbk
+              Deploy          mb hst      -> deploy  ic_ro hst                        >>= write mb
               Sign                        -> sign_ks ic_ro
               Verify                      -> T.putStrLn "the keystore matches the signature"
+              ListHosts                   -> error "main: ListHosts"
               InfoKey         mbk         -> T.putStr $ keyHelp mbk
               InfoSection     mbs         -> sectionHelp mbs                          >>= T.putStr
               SecretScript                -> secretKeySummary ic sections             >>= T.putStr
@@ -51,13 +52,6 @@ main =
               SampleScript                -> error "main: SampleScript"
               KS              _           -> error "main: KS"
             verify_ks False ic_ro
-
-load :: CtxParams -> IO IC
-load cp =
- do ok <- doesFileExist $ maybe ks_fp id $ cp_store cp
-    case ok of
-      True  -> instanceCtx cp
-      False -> error "keystore not present"
 
 sign_ks :: IC -> IO ()
 sign_ks ic = signKeystore ic sections >>= B.writeFile ks_mac_fp
@@ -86,4 +80,4 @@ sample_ln s = putStrLn $ "export " ++ "KEY_pw_" ++ s_ ++ "=pw_" ++ s_
     s_ = encode s
 
 write :: Maybe FilePath -> LBS.ByteString -> IO ()
-write = maybe LBS.putStr LBS.writeFile
+write = maybe LBS.putStrLn LBS.writeFile

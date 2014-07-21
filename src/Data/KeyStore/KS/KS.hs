@@ -21,6 +21,7 @@ module Data.KeyStore.KS.KS
     , errorKS
     , throwKS
     , lookupOpt
+    , storeKS
     , getSettings
     , lookupKey
     , insertNewKey
@@ -133,6 +134,9 @@ errorKS = throwKS . strMsg
 
 throwKS :: Reason -> KS a
 throwKS = E.throwError
+
+storeKS :: KS FilePath
+storeKS = ctx_store <$> KS ask
 
 lookupOpt :: Show a => Opt a -> KS a
 lookupOpt opt = getSettingsOpt opt <$> getSettings

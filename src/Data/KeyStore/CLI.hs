@@ -18,7 +18,7 @@ import           System.Exit
 
 
 version :: String
-version = "0.2.0.1"
+version = "0.3.0.0"
 
 cli :: IO ()
 cli = parseCLI >>= command Nothing
@@ -35,8 +35,8 @@ command mb_cp CLI{..} =
         _            -> instanceCtx cp
     let ic_ro = ro ic
     case cli_command of
-      Version                                   ->      putStrLn   version
-      Keystore                                  ->      putStrLn $ maybe defaultKeyStoreFilePath id $ cp_store cp
+      Version                                   ->      putStrLn     version
+      Keystore                                  ->      putStrLn =<< store ic
       Initialise               fp               ->      newKeyStore                     fp defaultSettings
       UpdateSettings           fp               ->      updateSettings   ic             fp
       ListSettings                              ->      listSettings     ic

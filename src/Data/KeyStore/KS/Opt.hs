@@ -216,14 +216,14 @@ intg_opt hp (inj,prj) x0 ce =
         { opt_enum    = ce
         , opt_default = x0
         , opt_from    = frm
-        , opt_to      = Number . I . toInteger . prj
+        , opt_to      = toJSON . prj
         , opt_help    = Help hp "<integer>"
         }
   where
     frm v =
-        case v of
-          Number (I i) -> inj $ fromInteger i
-          _            -> x0
+        case fromJSON v of
+          Success i -> inj i
+          Error   _ -> x0
 
 text_opt :: [T.Text] -> (T.Text->a,a->T.Text) -> a -> OptEnum -> Opt a
 text_opt hp (inj,prj) x0 ce =

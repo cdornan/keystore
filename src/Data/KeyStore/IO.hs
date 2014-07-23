@@ -80,7 +80,7 @@ import           Data.Time
 import           Text.Printf
 import           Control.Applicative
 import qualified Control.Exception              as X
-import           Control.Lens
+import qualified Control.Lens                   as L
 import           Control.Monad
 import           System.IO
 import           System.Locale
@@ -130,7 +130,7 @@ updateSettings :: IC -> FilePath -> IO ()
 updateSettings ic fp =
  do bs   <- LBS.readFile fp
     stgs <- e2io $ settingsFromBytes bs
-    run ic $ modConfig $ over cfg_settings $ const stgs
+    run ic $ modConfig $ L.over cfg_settings $ const stgs
 
 -- | List the triggers set up in the keystore on stdout.
 listTriggers :: IC -> IO ()
@@ -157,11 +157,11 @@ addTrigger ic tid pat fp =
 -- given pattern establishing the settings.
 addTrigger' :: IC -> TriggerID -> Pattern -> Settings -> IO ()
 addTrigger' ic tid pat stgs =
-    run ic $ modConfig $ over cfg_triggers $ Map.insert tid $ Trigger tid pat stgs
+    run ic $ modConfig $ L.over cfg_triggers $ Map.insert tid $ Trigger tid pat stgs
 
 -- | Remove the named trigger from the keystore.
 rmvTrigger :: IC -> TriggerID -> IO ()
-rmvTrigger ic tid = run ic $ modConfig $ over cfg_triggers $ Map.delete tid
+rmvTrigger ic tid = run ic $ modConfig $ L.over cfg_triggers $ Map.delete tid
 
 -- | Create an RSA key pair, encoding the private key in the named Safeguards.
 createRSAKeyPair :: IC -> Name -> Comment -> Identity -> [Safeguard] -> IO ()

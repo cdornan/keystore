@@ -49,7 +49,7 @@ import           Data.List
 import           Data.Time
 import           Text.Printf
 import           Control.Applicative
-import           Control.Lens
+import qualified Control.Lens                   as L
 import           Control.Monad
 
 
@@ -272,7 +272,7 @@ secure_key nm sg =
                  Just ek -> return ek
         ecd <- saveKS ek ct
         let ec = ec0 { _ec_secret_data = ecd }
-        insertKey $ over key_secret_copies (Map.insert sg ec) key
+        insertKey $ L.over key_secret_copies (Map.insert sg ec) key
 
 
 -------------------------------------------------------------------------------

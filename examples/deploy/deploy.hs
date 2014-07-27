@@ -75,7 +75,7 @@ key_prededicate :: Maybe HostID -> Maybe SectionID -> Maybe KeyID -> KeyPredicat
 key_prededicate = keyPrededicate
 
 sample_ln :: SectionID -> IO ()
-sample_ln s = putStrLn $ "export " ++ "KEY_pw_" ++ s_ ++ "=pw_" ++ s_
+sample_ln s = putStrLn $ "export " ++ "KEY_pw_" ++ s_ ++ "=pw_" ++ s_ ++ ";"
   where
     s_ = encode s
 

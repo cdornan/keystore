@@ -57,27 +57,41 @@ class (Bounded a,Enum a,Eq a, Ord a,Show a) => Code a where
     decode s = listToMaybe [ k | k<-[minBound..maxBound], encode k==s ]
 
 
+-- | This class describes the relationship between the host-id, section-id
+-- and key-id types used to build a hierarchical deployment model for a
+-- keystore. A minimal instance would have to define hostDeploySection.
+-- The deploy example program contains a fairly thorough example of this
+-- class being used to implement a quite realitic deploymrnt scenario.
 class (Code h, Code s, Code k) => Sections h s k
     | s -> h, k -> h
     , h -> s, k -> s
     , s -> k, h -> k
     where
-  hostSection      :: h -> s                          -- ^ the deployment section
-  hostRSection     :: h -> s                          -- ^ section where host-indexed
-                                                      -- keys reside for given host
-  sectionType      :: s -> SectionType
-  superSections    :: s -> [s]
-  keyIsHostIndexed :: k -> Maybe (h->Bool)
-  keyIsInSection   :: k -> s -> Bool
-  getKeyData       :: Maybe h -> s -> k -> IO KeyData
-  sectionSettings  :: Maybe s -> IO Settings
-  describeKey      :: k -> String
-  describeSection  :: s -> String
-  sectionPWEnvVar  :: s -> EnvVar
-
-  hostRSection          = hostSection
+  hostDeploySection :: h -> s                           -- ^ the deployment section: for a given host,
+                                                        -- the starting section for locating the keys
+                                                        -- during a deployment ('higher'/closer sections
+                                                        -- taking priority)
+  sectionType       :: s -> SectionType                 -- ^ whether the section holds the top key for the
+                                                        -- keystore (i.e., keystore master key), the signing key
+                                                        -- for the keystore or is a normal section containing
+                                                        -- deployment keys
+  superSections     :: s -> [s]                         -- ^ the sections that get a copy of the master
+                                                        -- for this section (making all of its keys
+                                                        -- available to them); N.B., the graph formed by this
+                                                        -- this relationship over the sections must be acyclic
+  keyIsHostIndexed  :: k -> Maybe (h->Bool)             -- ^ if the key is host-indexed then the predicate
+                                                        -- specifies the hosts that use this key
+  keyIsInSection    :: k -> s -> Bool                   -- ^ specifies which sections a key is resident in
+  getKeyData        :: Maybe h -> s -> k -> IO KeyData  -- ^ loads the data for a particular key
+  sectionSettings   :: Maybe s -> IO Settings           -- ^ loads the setting for a given settings
+  describeKey       :: k -> String                      -- ^ describes the key (for the ks help command)
+  describeSection   :: s -> String                      -- ^ describes the section (for the ks help command)
+  sectionPWEnvVar   :: s -> EnvVar                      -- ^ secifies the environment variable containing the
+                                                        -- ^ master password/provate key for for the given section
 
   sectionType           = const ST_keys
+
+  superSections         = const []
 
   keyIsHostIndexed      = const Nothing
 
@@ -95,13 +109,19 @@ class (Code h, Code s, Code k) => Sections h s k
   sectionPWEnvVar       = EnvVar . T.pack . ("KEY_" ++) . _name . passwordName
 
 
+-- | Sections are used to hold the top (master) key for the keystore,
+-- its signing key, or deployment keys
 data SectionType
   = ST_top
   | ST_signing
   | ST_keys
   deriving (Show,Eq,Ord)
 
-
+-- | A key is  triple containing some (plain-text) identity information for the
+-- key, some comment text and the secret text to be encrypted. Note that
+-- the keystore doesn't rely on this information but merely stores it. (They
+-- can be empty.) The identity field will often be used to storte the key's
+-- identity within the system that generates and uses it, ofor example.
 data KeyData =
   KeyData
     { kd_identity :: Identity
@@ -109,16 +129,25 @@ data KeyData =
     , kd_secret   :: B.ByteString
     }
 
-
+-- | One, many or all of the keys in a store may be rotated at a time.
+-- we use one of these to specify which keys are to be rotated.
 type KeyPredicate h s k = Maybe h -> s -> k -> Bool
 
+-- | Requests to retrieve a key from the staor can fail for various reasons.
 
+type Retrieve a = Either RetrieveDg a
+
+-- | This type specifies the reasons that an attempt to access a key from the
+-- store has failed. This kind of failure suggests an inconsistent model
+-- and will be raised regardless of which keys have been stored in the store.
 data RetrieveDg
   = RDG_key_not_reachable
   | RDG_no_such_host_key
   deriving (Show,Eq,Ord)
 
-
+-- | Here we create the store and rotate in a buch of keys. N.B. All of the
+-- section passwords must be bound in the process environment before calling
+-- procedure.
 initialise :: Sections h s k => CtxParams -> KeyPredicate h s k -> IO ()
 initialise cp kp = do
     stgs <- scs kp Nothing
@@ -134,37 +163,41 @@ initialise cp kp = do
     mks :: Sections h s k => KeyPredicate h s k -> IC -> s -> IO ()
     mks = const mk_section
 
+-- | Rotate in a set of keys spwecified by the predicate.
 rotate :: Sections h s k => IC -> KeyPredicate h s k -> IO ()
 rotate ic kp = sequence_ [ rotate' ic mb_h s k | (mb_h,s,k)<-host_keys++non_host_keys, kp mb_h s k ]
   where
-    host_keys     = [ (Just h ,s,k) | k<-[minBound..maxBound], Just hp<-[keyIsHostIndexed k], h<-[minBound..maxBound], hp h, let s=hostRSection h ]
-    non_host_keys = [ (Nothing,s,k) | k<-[minBound..maxBound], Nothing<-[keyIsHostIndexed k], s<-[minBound..maxBound],         keyIsInSection k s ]
+    host_keys     = [ (Just h ,s,k) | k<-[minBound..maxBound], Just isp<-[keyIsHostIndexed k], h<-[minBound..maxBound], isp h, let s = key_section h k ]
+    non_host_keys = [ (Nothing,s,k) | k<-[minBound..maxBound], Nothing <-[keyIsHostIndexed k], s<-[minBound..maxBound], keyIsInSection k s             ]
 
-retrieve :: Sections h s k => IC -> h -> k -> IO (Either RetrieveDg [Key])
-retrieve ic h k = either (return . Left) (\nm->Right <$> locateKeys ic nm) ei_nm
-  where
-    ei_nm = case keyIsHostIndexed k of
-      Nothing             -> ei_nm'   Nothing
-      Just hp | hp h      -> ei_nm' $ Just h
-              | otherwise -> Left RDG_no_such_host_key
+-- | Retrieve the keys for a given host from the store. Note that the whole history for the given key is returned.
+-- Note also that the secret text may not be present if it si not accessible (depnding upon hwich section passwords
+-- are correctly bound in the process environment). Note also that the 'Retrieve' diagnostic should not fail if a
+-- coherent model has been ddefined for 'Sections'.
+retrieve :: Sections h s k => IC -> h -> k -> IO (Retrieve [Key])
+retrieve ic h k = either (return . Left) (\nm->Right <$> locateKeys ic nm) $ keyName h k
 
-    ei_nm' mb_h = maybe (Left RDG_key_not_reachable) Right $
-        listToMaybe [ key_nme mb_h s_ k | s_ <- lower_sections s0, keyIsInSection k s_ ]
-
-    s0 = hostSection h
-
+-- | Sign the keystore. (Requites the password for the signing section to be correctly
+-- bound in the environment)
 signKeystore :: Sections h s k => IC -> SECTIONS h s k -> IO B.ByteString
 signKeystore ic scn = B.readFile (the_keystore $ ic_ctx_params ic) >>= sign_ ic (sgn_nme $ signing_key scn)
 
+-- Verify that the signature for a keystore matches the keystore.
 verifyKeystore :: IC -> B.ByteString -> IO Bool
 verifyKeystore ic sig = B.readFile (the_keystore $ ic_ctx_params ic) >>= flip (verify_ ic) sig
 
+-- | A predicate specifying all of the keys in the store.
 noKeys :: KeyPredicate h s k
 noKeys _ _ _ = False
 
+-- | A predicate specifying none of the keys in the keystore.
 allKeys :: KeyPredicate h s k
 allKeys _ _ _ = True
 
+-- | A utility for specifing a slice of the keys in the store, optionally specifying
+-- host section and key that should belong to the slice. (If the host is specified then
+-- the resulting predicate will only include host-indexed keys belonging to the
+-- given host.)
 keyPrededicate :: Sections h s k => Maybe h -> Maybe s -> Maybe k -> KeyPredicate h s k
 keyPrededicate mbh mbs mbk mbh_ s k = h_ok && s_ok && k_ok
   where
@@ -172,6 +205,8 @@ keyPrededicate mbh mbs mbk mbh_ s k = h_ok && s_ok && k_ok
     s_ok = maybe True                  (s==)       mbs
     k_ok = maybe True                  (k==)       mbk
 
+-- Generate some help text for the keys. If no key is specified then they are
+-- merely listed, otherwise the help for the given key is listed.
 keyHelp :: Sections h s k => Maybe k -> T.Text
 keyHelp x@Nothing  = T.unlines $ map (T.pack . encode) [minBound..maxBound `asTypeOf` fromJust x ]
 keyHelp   (Just k) = T.unlines $ map T.pack $ (map f $ concat
@@ -185,6 +220,8 @@ keyHelp   (Just k) = T.unlines $ map T.pack $ (map f $ concat
 
     f      = uncurry $ printf "%-10s %s"
 
+-- Generate some help text for the sectionss. If no section is specified then they are
+-- merely listed, otherwise the help for the given section is listed.
 sectionHelp :: Sections h s k => Maybe s -> IO T.Text
 sectionHelp x@Nothing  = return $ T.unlines $ map (T.pack . encode) [minBound..maxBound  `asTypeOf` fromJust x ]
 sectionHelp   (Just s) = do
@@ -204,7 +241,7 @@ sectionHelp   (Just s) = do
         ST_signing -> "(signing)"
         ST_keys    -> "(keys)"
     env = "$" ++ T.unpack (_EnvVar $ sectionPWEnvVar s)
-    hln = unwords $ nub [ encode h | h<-[minBound..maxBound], hostSection h==s ]
+    hln = unwords $ nub [ encode h | h<-[minBound..maxBound], hostDeploySection h==s ]
     sln = unwords $ map encode $ superSections s
     uln = unwords $ map encode $ [ s_ | s_<-[minBound..maxBound], s `elem` superSections s_ ]
     kln = fmt $ flip keyIsInSection s
@@ -213,6 +250,9 @@ sectionHelp   (Just s) = do
 
     fmt_s stgs = map ("    "++) $ lines $ LBS.unpack $ A.encode $ A.Object $ _Settings stgs
 
+-- | List a shell script for establishing all of the keys in the environment. NB For this
+-- to work the password for the top section (or the passwords for all of the sections
+-- must be bound if the store does not maintain a top key).
 secretKeySummary :: Sections h s k => IC -> SECTIONS h s k -> IO T.Text
 secretKeySummary ic scn = T.unlines <$> mapM f (sections scn)
   where
@@ -220,11 +260,15 @@ secretKeySummary ic scn = T.unlines <$> mapM f (sections scn)
       sec <- T.pack . B.unpack <$> (showSecret ic False $ passwordName s)
       return $ T.concat ["export ",_EnvVar $ sectionPWEnvVar s,"=",sec]
 
+-- | List a shell script for storing the public signing key for the store.
 publicKeySummary :: Sections h s k => IC -> SECTIONS h s k -> FilePath -> IO T.Text
 publicKeySummary ic scn fp = f <$> showPublic ic True (sgn_nme $ signing_key scn)
   where
     f b = T.pack $ "echo '" ++ B.unpack b ++ "' >" ++ fp ++ "\n"
 
+-- | List all of the keys that have the given name as their prefix. If the
+-- generic name of a key is given then it will list the complete history for
+-- the key, the current (or most recent) entry first.
 locateKeys :: IC -> Name -> IO [Key]
 locateKeys ic nm = sortBy (flip $ comparing _key_name) . filter yup <$> keys ic
   where
@@ -233,9 +277,32 @@ locateKeys ic nm = sortBy (flip $ comparing _key_name) . filter yup <$> keys ic
 
     nm_s    = _name nm
 
-keyName :: Sections h s k => h -> k -> Name
-keyName h k = key_nme (const h <$> keyIsHostIndexed k) (hostSection h) k
+-- | Return the genertic name for a given key thst is used by the specified
+-- host, returning a failure diagnostic if the host does not have such a key
+-- on the given Section model.
+keyName :: Sections h s k => h -> k -> Retrieve Name
+keyName h k = do
+  mb_h <- case keyIsHostIndexed k of
+            Nothing             -> return Nothing
+            Just hp | hp h      -> return $ Just h
+                    | otherwise -> Left RDG_no_such_host_key
+  s <- keySection h k
+  return $ key_nme mb_h s k
 
+-- a wrapper on keySection used internally in functional contezxtx
+key_section :: Sections h s k => h -> k -> s
+key_section h k = either oops id $ keySection h k
+  where
+    oops = error "key_section"
+
+-- | Rerurn the section that a host sores a given key in, returning a
+-- failure diagnostic if the host does not keep such a key in the given
+-- 'Section' model.
+keySection :: Sections h s k => h -> k -> Retrieve s
+keySection h k = maybe (Left RDG_key_not_reachable) return $ listToMaybe $
+  filter (keyIsInSection k) $ lower_sections $ hostDeploySection h
+
+-- | The name of the key that stores the password for a given sections.
 passwordName :: Sections h s k => s -> Name
 passwordName s = name' $ "pw_"   ++ encode s
 

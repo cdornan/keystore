@@ -1,0 +1,30 @@
+-*-change-log-*-
+
+0.1.0.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-03-30
+	* First public release
+
+0.1.1.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-06-08
+	* Fix read-only behaviour, adding --read-only flag
+
+0.2.0.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-06
+	* Reorganise module hierarchy and code base
+	* Add Data.KeyStore.Sections
+	* Replace 'psd' example with 'deploy' example
+
+0.2.0.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-07
+	* Fix 'deploy' example
+
+0.3.0.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-23
+	* Fix CLI organization
+	* Add hostRSection to Sections class
+
+0.3.0.1 Adam Gundry  <adam@well-typed.com>      2014-07-23
+	* Add GHC 0.7.8.3 compatability
+
+0.4.0.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-26
+	* Remove hostRSection from Sections class!
+	* Reorganise Sections simplifying and fixing host/section relationship
+	* Fix 'deploy' example to work with new sections
+	* Write Haddock annotations for Sections module.
+	* Tidy cabal file
+	* Revise readme and cabal documentation

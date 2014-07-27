@@ -65,35 +65,25 @@ instance Code KeyID where
   encode = drop 2 . show
 
 instance Sections HostID SectionID KeyID where
-  hostSection      = host_section
-  hostRSection     = host_resident_section
-  sectionType      = section_type
-  superSections    = super_sections
-  keyIsHostIndexed = key_is_host_indexed
-  keyIsInSection   = key_is_in_section
-  getKeyData       = get_key_data
-  sectionSettings  = section_settings
-  describeKey      = describe_key
-  describeSection  = describe_section
+  hostDeploySection = host_deploy_section
+  sectionType       = section_type
+  superSections     = super_sections
+  keyIsHostIndexed  = key_is_host_indexed
+  keyIsInSection    = key_is_in_section
+  getKeyData        = get_key_data
+  sectionSettings   = section_settings
+  describeKey       = describe_key
+  describeSection   = describe_section
 
 sections :: SECTIONS HostID SectionID KeyID
 sections = SECTIONS
 
-host_section :: HostID -> SectionID
-host_section h =
+host_deploy_section :: HostID -> SectionID
+host_deploy_section h =
   case h of
     H_live_eu    -> S_eu_admin
     H_staging_eu -> S_eu_staging
     H_live_us    -> S_us_admin
-    H_staging_us -> S_us_staging
-    H_dev        -> S_dev
-
-host_resident_section :: HostID -> SectionID
-host_resident_section h =
-  case h of
-    H_live_eu    -> S_eu_deploy
-    H_staging_eu -> S_eu_staging
-    H_live_us    -> S_us_deploy
     H_staging_us -> S_us_staging
     H_dev        -> S_dev
 
@@ -145,7 +135,7 @@ get_key_data mb_h s k =
   return
     KeyData
       { kd_identity = Identity $ T.pack $ mk "id"
-      , kd_comment  = Comment  $ T.pack $ mk "id"
+      , kd_comment  = Comment  $ T.pack $ mk "comment"
       , kd_secret   =            B.pack $ mk "secret"
       }
   where

@@ -34,7 +34,6 @@ import qualified Data.Map                       as Map
 import qualified Data.ByteString.Lazy.Char8     as LBS
 import qualified Data.HashMap.Strict            as HM
 import           Data.Aeson
-import           Data.Attoparsec.Number
 import qualified Data.Text                      as T
 import           Data.Monoid
 import           Data.Maybe
@@ -223,7 +222,7 @@ intg_opt hp (inj,prj) x0 ce =
     frm v =
         case fromJSON v of
           Success i -> inj i
-          Error   _ -> x0
+          _         -> x0
 
 text_opt :: [T.Text] -> (T.Text->a,a->T.Text) -> a -> OptEnum -> Opt a
 text_opt hp (inj,prj) x0 ce =

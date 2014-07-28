@@ -7,9 +7,11 @@ module Data.KeyStore.KS.Opt
     , OptEnum(..)
     , opt_enum
     , getSettingsOpt
+    , getSettingsOpt'
     , setSettingsOpt
     , opt__debug_enabled
     , opt__verify_enabled
+    , opt__sections_fix
     , opt__backup_keys
     , opt__hash_comment
     , opt__hash_prf
@@ -39,6 +41,7 @@ import           Data.Monoid
 import           Data.Maybe
 import           Data.Char
 import           Text.Printf
+import           Control.Applicative
 
 
 data Opt a
@@ -58,8 +61,10 @@ data Help
     deriving Show
 
 getSettingsOpt :: Opt a -> Settings -> a
-getSettingsOpt Opt{..} (Settings hm) =
-                maybe opt_default opt_from $ HM.lookup (optName opt_enum) hm
+getSettingsOpt opt = maybe (opt_default opt) id . getSettingsOpt' opt
+
+getSettingsOpt' :: Opt a -> Settings -> Maybe a
+getSettingsOpt' Opt{..} (Settings hm) = opt_from <$> HM.lookup (optName opt_enum) hm
 
 setSettingsOpt :: Opt a -> a -> Settings -> Settings
 setSettingsOpt Opt{..} x (Settings hm) =
@@ -71,6 +76,9 @@ opt__debug_enabled        = bool_opt dbg_help                            False  
 
 opt__verify_enabled       :: Opt Bool
 opt__verify_enabled       = bool_opt vfy_help                            False       Verify__enabled
+
+opt__sections_fix         :: Opt Bool
+opt__sections_fix         = bool_opt sfx_help                            False       Sections__fix
 
 opt__backup_keys          :: Opt [Name]
 opt__backup_keys          = backup_opt bku_help                                      Backup__keys
@@ -106,6 +114,7 @@ opt__crypt_salt_octets    = intg_opt cna_help (Octets    ,_Octets    )   16     
 data OptEnum
     = Debug__enabled
     | Verify__enabled
+    | Sections__fix
     | Backup__keys
     | Hash__comment
     | Hash__prf
@@ -125,6 +134,7 @@ opt_ enm =
     case enm of
       Debug__enabled        -> Opt_ opt__debug_enabled
       Verify__enabled       -> Opt_ opt__verify_enabled
+      Sections__fix         -> Opt_ opt__sections_fix
       Backup__keys          -> Opt_ opt__backup_keys
       Hash__comment         -> Opt_ opt__hash_comment
       Hash__prf             -> Opt_ opt__hash_prf
@@ -258,7 +268,7 @@ enum_opt hp shw x0 ce =
 
     typ   = T.intercalate "|" $ map shw [minBound..maxBound]
 
-dbg_help, vfy_help, bku_help, hcm_help, hpr_help, hit_help, hwd_help,
+dbg_help, vfy_help, sfx_help, bku_help, hcm_help, hpr_help, hit_help, hwd_help,
     hna_help, ccy_help, cpr_help, cit_help, cna_help :: [T.Text]
 
 dbg_help =
@@ -269,6 +279,11 @@ vfy_help =
   , "in which the secret text loaded from environment"
   , "variables is checked against the stored MACs."
   , "These checks can consume a lot of compute time."
+  ]
+sfx_help =
+  [ "Set when a 'Sections' keystore has been fixed so that"
+  , "section, key and host names no longer contrained to avoid"
+  , "prefixes."
   ]
 bku_help =
   [ "Controls the default keys that will be used to make secret copies"

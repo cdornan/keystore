@@ -57,7 +57,7 @@ sign_ks :: IC -> IO ()
 sign_ks ic = signKeystore ic sections >>= B.writeFile ks_mac_fp
 
 verify_ks :: Bool -> IC -> IO ()
-verify_ks fatal ic = chk =<< catch (B.readFile ks_mac_fp >>= verifyKeystore ic) hdl
+verify_ks fatal ic = chk =<< catch (B.readFile ks_mac_fp >>= verifyKeystore ic sections) hdl
   where
     chk True              = return ()
     chk False | fatal     = error msg

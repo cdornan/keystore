@@ -62,6 +62,10 @@ module Data.KeyStore.IO
     , verify
     , verify_
     , run
+    , getKeystore
+    , getState
+    , getCtxState
+    , putCtxState
     ) where
 
 import           Data.KeyStore.IO.IC
@@ -105,7 +109,7 @@ newKeyStore str_fp stgs =
 -- context to be cached between calls to these access functions.
 instanceCtx :: CtxParams -> IO IC
 instanceCtx cp =
- do ctx_st <- get $ instanceCtx_ cp
+ do ctx_st <- getCtxState $ instanceCtx_ cp
     IC cp . Just <$> newIORef ctx_st
 
 -- | This functional method will generate an IC that will not cache any
@@ -268,7 +272,7 @@ keyInfo ic nm = run ic $ keyInfoKS nm
 
 -- | Return all of the keys in the keystore.
 keys :: IC -> IO [Key]
-keys ic = Map.elems . _ks_keymap <$> get_keystore ic
+keys ic = Map.elems . _ks_keymap <$> getKeystore ic
 
 -- | Delete a list of keys from the keystore.
 deleteKeys :: IC -> [Name] -> IO ()
@@ -345,14 +349,14 @@ verify_ ic m_bs s_bs =
 -- debug logging and errors.
 run :: IC -> KS a -> IO a
 run ic p =
- do (ctx,st0) <- get ic
+ do (ctx,st0) <- getCtxState ic
     st1 <- scan_env ctx st0
     let msg         = "[Keystore: " ++ ctx_store ctx ++"]\n"
         (e,st2,les) = run_ ctx st1 $ debugLog msg >> p
     r <- e2io e
     mapM_ (logit ctx) les
     st' <- backup_env ctx st2
-    put ic ctx st'
+    putCtxState ic ctx st'
     return r
 
 scan_env :: Ctx -> State -> IO State
@@ -371,20 +375,20 @@ backup_env ctx st0 =
   where
     (e,st',les') = run_ ctx st0 backupKeysKS
 
-get_keystore :: IC -> IO KeyStore
-get_keystore ic = st_keystore <$> get_state ic
+getKeystore :: IC -> IO KeyStore
+getKeystore ic = st_keystore <$> getState ic
 
-get_state :: IC -> IO State
-get_state ic = snd <$> get ic
+getState :: IC -> IO State
+getState ic = snd <$> getCtxState ic
 
-get :: IC -> IO (Ctx,State)
-get IC{..} =
+getCtxState :: IC -> IO (Ctx,State)
+getCtxState IC{..} =
     case ic_cache of
       Nothing -> determineCtx ic_ctx_params
       Just rf -> readIORef rf
 
-put :: IC -> Ctx -> State -> IO ()
-put IC{..} ctx st =
+putCtxState :: IC -> Ctx -> State -> IO ()
+putCtxState IC{..} ctx st =
  do maybe (return ()) (flip writeIORef (ctx,st)) ic_cache
     when (not $ maybe False id $ cp_readonly ic_ctx_params) $
         LBS.writeFile (ctx_store ctx) $ keyStoreBytes $ st_keystore st

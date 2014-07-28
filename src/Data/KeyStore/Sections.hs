@@ -31,17 +31,23 @@ module Data.KeyStore.Sections
   where
 
 import           Data.KeyStore.IO
+import           Data.KeyStore.KS
 import qualified Data.Text                      as T
 import qualified Data.ByteString.Char8          as B
 import qualified Data.ByteString.Lazy.Char8     as LBS
 import qualified Data.Aeson                     as A
 import qualified Data.HashMap.Strict            as HM
 import qualified Data.Vector                    as V
+import qualified Data.Map                       as Map
 import           Data.Maybe
 import           Data.List
+import           Data.Char
 import           Data.Ord
+import           Data.String
 import           Data.Monoid
+import           Control.Lens
 import           Control.Applicative
+import           Control.Monad
 import           Text.Printf
 import           System.FilePath
 import           Safe
@@ -150,7 +156,7 @@ data RetrieveDg
 -- procedure.
 initialise :: Sections h s k => CtxParams -> KeyPredicate h s k -> IO ()
 initialise cp kp = do
-    stgs <- scs kp Nothing
+    stgs <- setSettingsOpt opt__sections_fix True <$> scs kp Nothing
     newKeyStore (the_keystore cp) stgs
     ic <- instanceCtx cp
     mapM_ (mks kp ic) [minBound..maxBound]
@@ -165,26 +171,34 @@ initialise cp kp = do
 
 -- | Rotate in a set of keys spwecified by the predicate.
 rotate :: Sections h s k => IC -> KeyPredicate h s k -> IO ()
-rotate ic kp = sequence_ [ rotate' ic mb_h s k | (mb_h,s,k)<-host_keys++non_host_keys, kp mb_h s k ]
+rotate ic kp = reformat ic' $ sequence_ [ rotate' ic mb_h s k | (mb_h,s,k)<-host_keys++non_host_keys, kp mb_h s k ]
   where
     host_keys     = [ (Just h ,s,k) | k<-[minBound..maxBound], Just isp<-[keyIsHostIndexed k], h<-[minBound..maxBound], isp h, let s = key_section h k ]
     non_host_keys = [ (Nothing,s,k) | k<-[minBound..maxBound], Nothing <-[keyIsHostIndexed k], s<-[minBound..maxBound], keyIsInSection k s             ]
+
+    ic' = kp_RFT kp ic
 
 -- | Retrieve the keys for a given host from the store. Note that the whole history for the given key is returned.
 -- Note also that the secret text may not be present if it si not accessible (depnding upon hwich section passwords
 -- are correctly bound in the process environment). Note also that the 'Retrieve' diagnostic should not fail if a
 -- coherent model has been ddefined for 'Sections'.
 retrieve :: Sections h s k => IC -> h -> k -> IO (Retrieve [Key])
-retrieve ic h k = either (return . Left) (\nm->Right <$> locateKeys ic nm) $ keyName h k
+retrieve ic h k = reformat ic' $ either (return . Left) (\nm->Right <$> locate_keys ic' nm) $ keyName h k
+  where
+    ic' = h_RFT h ic
 
 -- | Sign the keystore. (Requites the password for the signing section to be correctly
 -- bound in the environment)
 signKeystore :: Sections h s k => IC -> SECTIONS h s k -> IO B.ByteString
-signKeystore ic scn = B.readFile (the_keystore $ ic_ctx_params ic) >>= sign_ ic (sgn_nme $ signing_key scn)
+signKeystore ic scn = reformat ic' $ B.readFile (the_keystore $ ic_ctx_params ic) >>= sign_ ic (sgn_nme $ signing_key scn)
+  where
+    ic' = scn_RFT scn ic
 
 -- Verify that the signature for a keystore matches the keystore.
-verifyKeystore :: IC -> B.ByteString -> IO Bool
-verifyKeystore ic sig = B.readFile (the_keystore $ ic_ctx_params ic) >>= flip (verify_ ic) sig
+verifyKeystore :: Sections h s k => IC -> SECTIONS h s k -> B.ByteString -> IO Bool
+verifyKeystore ic scn sig = reformat ic' $ B.readFile (the_keystore $ ic_ctx_params ic) >>= flip (verify_ ic) sig
+  where
+    ic' = scn_RFT scn ic
 
 -- | A predicate specifying all of the keys in the store.
 noKeys :: KeyPredicate h s k
@@ -254,28 +268,37 @@ sectionHelp   (Just s) = do
 -- to work the password for the top section (or the passwords for all of the sections
 -- must be bound if the store does not maintain a top key).
 secretKeySummary :: Sections h s k => IC -> SECTIONS h s k -> IO T.Text
-secretKeySummary ic scn = T.unlines <$> mapM f (sections scn)
+secretKeySummary ic scn = reformat ic' $ T.unlines <$> mapM f (sections scn)
   where
     f s = do
       sec <- T.pack . B.unpack <$> (showSecret ic False $ passwordName s)
       return $ T.concat ["export ",_EnvVar $ sectionPWEnvVar s,"=",sec]
 
+    ic' = scn_RFT scn ic
+
 -- | List a shell script for storing the public signing key for the store.
 publicKeySummary :: Sections h s k => IC -> SECTIONS h s k -> FilePath -> IO T.Text
-publicKeySummary ic scn fp = f <$> showPublic ic True (sgn_nme $ signing_key scn)
+publicKeySummary ic scn fp = reformat ic' $ f <$> showPublic ic True (sgn_nme $ signing_key scn)
   where
     f b = T.pack $ "echo '" ++ B.unpack b ++ "' >" ++ fp ++ "\n"
+
+    ic' = scn_RFT scn ic
 
 -- | List all of the keys that have the given name as their prefix. If the
 -- generic name of a key is given then it will list the complete history for
 -- the key, the current (or most recent) entry first.
-locateKeys :: IC -> Name -> IO [Key]
-locateKeys ic nm = sortBy (flip $ comparing _key_name) . filter yup <$> keys ic
+locateKeys :: Sections h s k => IC -> SECTIONS h s k -> Name -> IO [Key]
+locateKeys ic scn nm = locate_keys ic' nm
+  where
+    ic' = scn_RFT scn ic
+
+locate_keys :: Sections h s k => REFORMAT h s k -> Name -> IO [Key]
+locate_keys ic' nm = reformat ic' $ sortBy (flip $ comparing _key_name) . filter yup <$> keys ic
   where
     yup     = isp . _key_name
     isp nm' = nm_s `isPrefixOf` _name nm'
-
     nm_s    = _name nm
+    ic      = _REFORMAT ic'
 
 -- | Return the genertic name for a given key thst is used by the specified
 -- host, returning a failure diagnostic if the host does not have such a key
@@ -304,7 +327,7 @@ keySection h k = maybe (Left RDG_key_not_reachable) return $ listToMaybe $
 
 -- | The name of the key that stores the password for a given sections.
 passwordName :: Sections h s k => s -> Name
-passwordName s = name' $ "pw_"   ++ encode s
+passwordName s = name' $ "/pw/"   ++ encode s
 
 fmt :: Code a => (a->Bool) -> String
 fmt p  = unwords [ encode h | h<-[minBound..maxBound], p h ]
@@ -385,18 +408,18 @@ backup_password :: Sections h s k => IC -> s -> s -> IO ()
 backup_password ic s sv_s = secureKey ic (passwordName s) $ safeguard [sve_nme sv_s]
 
 key_nme :: Sections h s k => Maybe h -> s -> k -> Name
-key_nme mb_h s k = name' $ encode s ++ "_" ++ encode k ++ hst_sfx
+key_nme mb_h s k = name' $ encode s ++ "/" ++ encode k ++ hst_sfx
   where
-    hst_sfx = maybe "" (\h -> "_" ++ encode h) mb_h
+    hst_sfx = maybe "" (\h -> "/" ++ encode h) mb_h
 
 sgn_nme :: Sections h s k => s -> Name
-sgn_nme s = name' $ encode s ++ "_keystore_signing_key"
+sgn_nme s = name' $ encode s ++ "/keystore_signing_key"
 
 sve_nme :: Sections h s k => s -> Name
-sve_nme s = name' $ "save_" ++ encode s
+sve_nme s = name' $ "/save/" ++ encode s
 
 scn_pattern :: Sections h s k => s -> Pattern
-scn_pattern s = pattern $ "^" ++ encode s ++ "_.*"
+scn_pattern s = pattern $ "^" ++ encode s ++ "/.*"
 
 unique_nme :: IC -> Name -> IO Name
 unique_nme ic nm =
@@ -411,10 +434,7 @@ unique_nme' nms nm0 = headNote "unique_name'" c_nms
     c_nms = [ nm | i<-[length nms+1..], let nm=nname i nm0, nm `notElem` nms ]
 
     nname :: Int -> Name -> Name
-    nname i nm_ = name' $ _name nm_ ++ printf "_%03d" i
-
-name' :: String -> Name
-name' = either (error.show) id . name
+    nname i nm_ = name' $ _name nm_ ++ printf "/%03d" i
 
 the_keystore :: CtxParams -> FilePath
 the_keystore = maybe "keystore.json" id . cp_store
@@ -432,3 +452,213 @@ get_kd sd k = do
       }
   where
     fp sfx = sd </> encode k ++ sfx
+
+
+--------------------------------------------------------------------------------
+--
+-- Regormating the KeyStore Names to Allow Prefixes (#3)
+--
+--------------------------------------------------------------------------------
+
+
+reformat :: Sections h s k => REFORMAT h s k -> IO a -> IO a
+reformat rft@(REFORMAT ic) p = reformat_ic (encoding rft) ic >> p
+
+-- Proxy city!
+
+data REFORMAT h s k = REFORMAT { _REFORMAT :: IC }
+
+data CODE a = CODE
+
+scn_RFT :: SECTIONS     h s k -> IC -> REFORMAT h s k
+kp_RFT  :: KeyPredicate h s k -> IC -> REFORMAT h s k
+h_RFT   ::              h     -> IC -> REFORMAT h s k
+
+scn_RFT _ ic = REFORMAT ic
+kp_RFT  _ ic = REFORMAT ic
+h_RFT   _ ic = REFORMAT ic
+
+reformat_ic :: Encoding -> IC -> IO ()
+reformat_ic enc ic = do
+  (ctx,st) <- getCtxState ic
+  putCtxState ic ctx $
+    st { st_keystore = reformat_keystore enc $ st_keystore st }
+
+reformat_keystore :: Encoding -> KeyStore -> KeyStore
+reformat_keystore enc ks =
+  case getSettingsOpt opt__sections_fix $ _cfg_settings $ _ks_config ks of
+    True  -> ks
+    False -> over ks_config (reformat_config  enc) $
+             over ks_keymap (reformat_key_map enc) ks
+
+reformat_config :: Encoding -> Configuration -> Configuration
+reformat_config enc =
+  over cfg_settings (setSettingsOpt opt__sections_fix True) .
+  over cfg_settings (reformat_settings enc) .
+  over cfg_triggers (reformat_triggers enc)
+
+reformat_triggers :: Encoding -> TriggerMap -> TriggerMap
+reformat_triggers enc = Map.map $
+  over trg_pattern  (reformat_pattern  enc) .
+  over trg_settings (reformat_settings enc)
+
+reformat_settings :: Encoding -> Settings -> Settings
+reformat_settings enc stgs =
+  case getSettingsOpt' opt__backup_keys stgs of
+    Nothing  -> stgs
+    Just nms -> setSettingsOpt opt__backup_keys (map (reformat_name enc) nms) stgs
+
+reformat_pattern :: Encoding -> Pattern -> Pattern
+reformat_pattern enc pat = maybe oops id $ run_munch (m_pattern enc) $ _pat_string pat
+  where
+    oops = error $ "reformat_pattern: bad pattern format: " ++ _pat_string pat
+
+reformat_key_map :: Encoding -> KeyMap -> KeyMap
+reformat_key_map enc km = Map.fromList [ (reformat_name enc nm,r_ky ky) | (nm,ky)<-Map.toList km ]
+  where
+    r_ky =
+      over key_name          (reformat_name enc) .
+      over key_secret_copies (reformat_ecm  enc)
+
+reformat_ecm :: Encoding -> EncrypedCopyMap -> EncrypedCopyMap
+reformat_ecm enc ecm = Map.fromList [ (reformat_sg enc sg,r_ec ec) | (sg,ec)<-Map.toList ecm ]
+  where
+    r_ec = over ec_safeguard (reformat_sg enc)
+
+reformat_sg :: Encoding -> Safeguard -> Safeguard
+reformat_sg enc = safeguard . map (reformat_name enc) . safeguardKeys
+
+reformat_name :: Encoding -> Name -> Name
+reformat_name enc nm = maybe oops id $ run_munch (m_name enc) $ _name nm
+  where
+    oops = error $ "reformat_name: bad name format: " ++ _name nm
+
+m_pattern :: Encoding -> Munch Pattern
+m_pattern enc = do
+  munch_ "^"
+  s <- enc_s enc
+  munch_ "_.*"
+  return $ fromString $ "^" ++ s ++ "/.*"
+
+m_name, m_save, m_pw, m_section :: Encoding -> Munch Name
+
+m_name enc = m_save enc <|> m_pw enc <|> m_section enc
+
+m_save enc = do
+  munch_ "save_"
+  s <- enc_s enc
+  return $ name' $ "/save/" ++ s
+
+m_pw enc = do
+  munch_ "pw_"
+  s <- enc_s enc
+  return $ name' $ "/pw/" ++ s
+
+m_section enc = do
+  s <- enc_s enc
+  m_section_signing enc s <|> m_section_key enc s
+
+m_section_key, m_section_signing  :: Encoding -> String -> Munch Name
+
+m_section_signing _ s = do
+  munch_ "_keystore_signing_key"
+  return $ name' $ s ++ "/keystore_signing_key"
+
+m_section_key enc s = do
+  munch_ "_"
+  k <- enc_k enc
+  m_section_key_host enc s k <|> m_section_key_vrn enc s k
+
+m_section_key_vrn, m_section_key_host :: Encoding -> String -> String -> Munch Name
+
+m_section_key_vrn _ s k = do
+  munch_ "_"
+  v <- munch_vrn
+  return $ name' $ s ++"/" ++ k ++ "/" ++ v
+
+m_section_key_host enc s k = do
+  munch_ "_"
+  h <- enc_h enc
+  munch_ "_"
+  v <- munch_vrn
+  return $ name' $ s ++"/" ++ k ++ "/" ++ h ++ "/" ++ v
+
+munch_vrn :: Munch String
+munch_vrn = do
+  c1 <- munch1 isDigit
+  c2 <- munch1 isDigit
+  c3 <- munch1 isDigit
+  return [c1,c2,c3]
+
+-- Capturing the host, section and key encodings in a nice convenient
+-- monotype that we can pass around.
+
+data Encoding =
+  Encoding
+    { enc_h, enc_s, enc_k :: Munch String
+    }
+
+encoding :: Sections h s k => REFORMAT h s k -> Encoding
+encoding rft =
+  Encoding
+    { enc_h = code_m $ host_c    rft
+    , enc_s = code_m $ section_c rft
+    , enc_k = code_m $ key_c     rft
+    }
+  where
+    host_c      :: Sections h s k => REFORMAT h s k -> CODE h
+    host_c    _ = CODE
+
+    section_c   :: Sections h s k => REFORMAT h s k -> CODE s
+    section_c _ = CODE
+
+    key_c       :: Sections h s k => REFORMAT h s k -> CODE k
+    key_c     _ = CODE
+
+code_m :: Code a => CODE a -> Munch String
+code_m c = foldr (<|>) empty $ [ munch $ encode x | x<-bds c ]
+  where
+    bds :: Code a => CODE a -> [a]
+    bds _ = [minBound..maxBound]
+
+-- our Munch Monad
+
+newtype Munch a = Munch { _Munch :: String -> Maybe (a,String) }
+
+instance Functor Munch where
+  fmap f m = m >>= \x -> return $ f x
+
+instance Applicative Munch where
+  pure  = return
+  (<*>) = ap
+
+instance Alternative Munch where
+  empty     = Munch $ const Nothing
+  (<|>) x y = Munch $ \s -> _Munch x s <|> _Munch y s
+
+instance Monad Munch where
+  return x  = Munch $ \s -> Just (x,s)
+  (>>=) m f = Munch $ \s -> _Munch m s >>= \(x,s') -> _Munch (f x) s'
+
+run_munch :: Munch a -> String -> Maybe a
+run_munch (Munch f) str = case f str of
+  Just (x,"") -> Just x
+  _           -> Nothing
+
+munch1 :: (Char->Bool) -> Munch Char
+munch1 p = Munch $ \str -> case str of
+  c:t | p c -> Just (c,t)
+  _         -> Nothing
+
+munch_ :: String -> Munch ()
+munch_ s = const () <$> munch s
+
+munch :: String -> Munch String
+munch str_p = Munch $ \str -> case str_p `isPrefixOf` str of
+  True  -> Just (str_p,drop (length str_p) str)
+  False -> Nothing
+
+--------------------------------------------------------------------------------
+
+name' :: String -> Name
+name' = either (error.show) id . name

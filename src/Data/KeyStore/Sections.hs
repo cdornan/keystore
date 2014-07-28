@@ -112,7 +112,7 @@ class (Code h, Code s, Code k) => Sections h s k
 
   describeSection     s = "The '" ++ encode s ++ "' Section."
 
-  sectionPWEnvVar       = EnvVar . T.pack . ("KEY_" ++) . _name . passwordName
+  sectionPWEnvVar       = EnvVar . T.pack . ("KEY_pw_" ++) . encode
 
 
 -- | Sections are used to hold the top (master) key for the keystore,

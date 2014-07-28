@@ -35,3 +35,6 @@
 	* opened up the export of Data.KeyStore.Types
 	* added getSettingsOpt' to Data.KeyStore.KS.Opt
 	* Fix #1, (section, key and host prefixes)
+
+0.5.0.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-28
+	* fix default sectionPWEnvVar in Sections class

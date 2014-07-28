@@ -45,7 +45,7 @@ import           Data.Char
 import           Data.Ord
 import           Data.String
 import           Data.Monoid
-import           Control.Lens
+import           Control.Lens(over)
 import           Control.Applicative
 import           Control.Monad
 import           Text.Printf

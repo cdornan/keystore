@@ -38,3 +38,6 @@
 
 0.5.0.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-28
 	* fix default sectionPWEnvVar in Sections class
+
+0.5.0.2 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-28
+	* improve build stability of Sections: list the things we need from Control.Lens

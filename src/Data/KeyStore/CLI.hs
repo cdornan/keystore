@@ -18,7 +18,7 @@ import           System.Exit
 
 
 version :: String
-version = "0.5.0.1"
+version = "0.5.0.2"
 
 cli :: IO ()
 cli = parseCLI >>= command Nothing

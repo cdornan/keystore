@@ -35,9 +35,30 @@
 	* opened up the export of Data.KeyStore.Types
 	* added getSettingsOpt' to Data.KeyStore.KS.Opt
 	* Fix #1, (section, key and host prefixes)
+	* NB: this release will auto-migrate a keystore reformating the identifers
+	  to life the 'no-prefixes' restrictions BUT:
+	    + the change of format will only persist when the store is written
+	      back, which usually only happens on an edit operation that
+	      changes the keystore (e.g., by rotating a key) or, better, by forcing
+	      the kmeystore to be written back);
+	    + the keystore's (detached) signature will not be migrated
+	      but you will have to re-sign the keystore after it has been
+	      reformatted anyway; your best bet is to remove the signature (to prevent
+	      an error arising from the failure to find the signing key under
+	      its old name, (mis)identified in the signature) and resigning the
+	      store.
+
+	  For example, to migrate the example store, you could do something like this:
+
+	      $ rm deploy-keystore.hash
+	      $ deploy -w sign
 
 0.5.0.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-28
 	* fix default sectionPWEnvVar in Sections class
 
 0.5.0.2 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-28
 	* improve build stability of Sections: list the things we need from Control.Lens
+
+0.5.0.3 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-30
+	* fix key-formatting bug (gratuitious insertion of double '/'s before the
+	  version number)

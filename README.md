@@ -85,6 +85,16 @@ flexible, secure and well-typed deployment scripts.
       + `Data.KeyStore.Types`: This provides access to keystores at the types
         level.
 
+
+0.5 Migration instructions
+--------------------------
+
+The formation of the names used in 'Data.Keystore.Sections' derived keystores
+has changed to fix an issue (#3) that barred hosts, sections and key identifiers
+from being prefixes of each other. See the changelog for details, especially
+on how to ensure that an existing Sections-based keystore gets migrated properly.
+
+
 Launch Instructions
 -------------------
 

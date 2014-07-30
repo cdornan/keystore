@@ -300,7 +300,7 @@ locate_keys ic' nm = reformat ic' $ sortBy (flip $ comparing _key_name) . filter
     nm_s    = _name nm
     ic      = _REFORMAT ic'
 
--- | Return the genertic name for a given key thst is used by the specified
+-- | Return the generic name for a given key thst is used by the specified
 -- host, returning a failure diagnostic if the host does not have such a key
 -- on the given Section model.
 keyName :: Sections h s k => h -> k -> Retrieve Name
@@ -408,7 +408,7 @@ backup_password :: Sections h s k => IC -> s -> s -> IO ()
 backup_password ic s sv_s = secureKey ic (passwordName s) $ safeguard [sve_nme sv_s]
 
 key_nme :: Sections h s k => Maybe h -> s -> k -> Name
-key_nme mb_h s k = name' $ encode s ++ "/" ++ encode k ++ hst_sfx
+key_nme mb_h s k = name' $ encode s ++ "/" ++ encode k ++ hst_sfx ++ "/"
   where
     hst_sfx = maybe "" (\h -> "/" ++ encode h) mb_h
 
@@ -434,7 +434,7 @@ unique_nme' nms nm0 = headNote "unique_name'" c_nms
     c_nms = [ nm | i<-[length nms+1..], let nm=nname i nm0, nm `notElem` nms ]
 
     nname :: Int -> Name -> Name
-    nname i nm_ = name' $ _name nm_ ++ printf "/%03d" i
+    nname i nm_ = name' $ _name nm_ ++ printf "%03d" i
 
 the_keystore :: CtxParams -> FilePath
 the_keystore = maybe "keystore.json" id . cp_store

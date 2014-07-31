@@ -312,11 +312,11 @@ keyName h k = do
   s <- keySection h k
   return $ key_nme mb_h s k
 
--- a wrapper on keySection used internally in functional contezxtx
+-- a wrapper on keySection used internally in functional contexts
 key_section :: Sections h s k => h -> k -> s
 key_section h k = either oops id $ keySection h k
   where
-    oops = error "key_section"
+    oops dg = error $ "key_section: " ++ encode h ++ ": " ++ encode k ++ ": " ++ show dg
 
 -- | Rerurn the section that a host sores a given key in, returning a
 -- failure diagnostic if the host does not keep such a key in the given

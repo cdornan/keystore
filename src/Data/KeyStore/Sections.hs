@@ -14,6 +14,7 @@ module Data.KeyStore.Sections
   , RetrieveDg(..)
   , initialise
   , rotate
+  , rotateIfChanged
   , retrieve
   , signKeystore
   , verifyKeystore
@@ -39,6 +40,7 @@ import qualified Data.Aeson                     as A
 import qualified Data.HashMap.Strict            as HM
 import qualified Data.Vector                    as V
 import qualified Data.Map                       as Map
+import           Data.API.Types
 import           Data.Maybe
 import           Data.List
 import           Data.Char
@@ -134,6 +136,7 @@ data KeyData =
     , kd_comment  :: Comment
     , kd_secret   :: B.ByteString
     }
+  deriving (Show,Eq)
 
 -- | One, many or all of the keys in a store may be rotated at a time.
 -- we use one of these to specify which keys are to be rotated.
@@ -169,9 +172,20 @@ initialise cp kp = do
     mks :: Sections h s k => KeyPredicate h s k -> IC -> s -> IO ()
     mks = const mk_section
 
--- | Rotate in a set of keys spwecified by the predicate.
+-- | Rotate in a set of keys specified by the predicate.
 rotate :: Sections h s k => IC -> KeyPredicate h s k -> IO ()
-rotate ic kp = reformat ic' $ sequence_ [ rotate' ic mb_h s k | (mb_h,s,k)<-host_keys++non_host_keys, kp mb_h s k ]
+rotate = rotate_ False
+
+-- | Rotate in a set of keys specified by the predicate, rotating each key only
+-- if it has changed: NB the check is contingent on the secret text being
+-- accessible; if the secret text is not accessible then the rotation will happen.
+rotateIfChanged :: Sections h s k => IC -> KeyPredicate h s k -> IO ()
+rotateIfChanged = rotate_ True
+
+-- | Rotate in a set of keys specified by the predicate with the first argument
+-- controlling whether to squash duplicate rotations
+rotate_ :: Sections h s k => Bool -> IC -> KeyPredicate h s k -> IO ()
+rotate_ ch ic kp = reformat ic' $ sequence_ [ rotate' ch ic mb_h s k | (mb_h,s,k)<-host_keys++non_host_keys, kp mb_h s k ]
   where
     host_keys     = [ (Just h ,s,k) | k<-[minBound..maxBound], Just isp<-[keyIsHostIndexed k], h<-[minBound..maxBound], isp h, let s = key_section h k ]
     non_host_keys = [ (Nothing,s,k) | k<-[minBound..maxBound], Nothing <-[keyIsHostIndexed k], s<-[minBound..maxBound], keyIsInSection k s             ]
@@ -179,7 +193,7 @@ rotate ic kp = reformat ic' $ sequence_ [ rotate' ic mb_h s k | (mb_h,s,k)<-host
     ic' = kp_RFT kp ic
 
 -- | Retrieve the keys for a given host from the store. Note that the whole history for the given key is returned.
--- Note also that the secret text may not be present if it si not accessible (depnding upon hwich section passwords
+-- Note also that the secret text may not be present if it is not accessible (depnding upon hwich section passwords
 -- are correctly bound in the process environment). Note also that the 'Retrieve' diagnostic should not fail if a
 -- coherent model has been ddefined for 'Sections'.
 retrieve :: Sections h s k => IC -> h -> k -> IO (Retrieve [Key])
@@ -327,16 +341,32 @@ keySection h k = maybe (Left RDG_key_not_reachable) return $ listToMaybe $
 
 -- | The name of the key that stores the password for a given sections.
 passwordName :: Sections h s k => s -> Name
-passwordName s = name' $ "/pw/"   ++ encode s
+passwordName s = name' $ "/pw/" ++ encode s
 
 fmt :: Code a => (a->Bool) -> String
 fmt p  = unwords [ encode h | h<-[minBound..maxBound], p h ]
 
-rotate' :: Sections h s k => IC -> Maybe h -> s -> k -> IO ()
-rotate' ic mb_h s k = do
-  KeyData{..} <- getKeyData mb_h s k
-  nm <- unique_nme ic $ key_nme mb_h s k
-  createKey ic nm kd_comment kd_identity Nothing (Just kd_secret)
+rotate' :: Sections h s k => Bool -> IC -> Maybe h -> s -> k -> IO ()
+rotate' ch ic mb_h s k = do
+    kd@KeyData{..} <- getKeyData mb_h s k
+    -- iff ch then compare the new value with the old
+    ok <- case ch of
+      True  -> do
+        -- if key has not changed then squash the rotation
+        mbkds <- map key2KeyData <$> locateKeys ic (mks k) g_nm
+        case mbkds of
+          Just kd':_ | kd==kd' -> return False
+          _                    -> return True
+      False ->
+        return True
+    when ok $ do
+      n_nm <- unique_nme ic g_nm
+      createKey ic n_nm kd_comment kd_identity Nothing $ Just kd_secret
+  where
+    g_nm = key_nme mb_h s k
+
+    mks :: k -> SECTIONS h s k
+    mks = const SECTIONS
 
 lower_sections :: Sections h s k => s -> [s]
 lower_sections s0 =
@@ -456,7 +486,7 @@ get_kd sd k = do
 
 --------------------------------------------------------------------------------
 --
--- Regormating the KeyStore Names to Allow Prefixes (#3)
+-- Reformating the KeyStore Names to Allow Prefixes (#3)
 --
 --------------------------------------------------------------------------------
 
@@ -659,6 +689,16 @@ munch str_p = Munch $ \str -> case str_p `isPrefixOf` str of
   False -> Nothing
 
 --------------------------------------------------------------------------------
+
+key2KeyData :: Key -> Maybe KeyData
+key2KeyData Key{..} = f <$> _key_clear_text
+  where
+    f (ClearText(Binary bs)) =
+      KeyData
+        { kd_identity = _key_identity
+        , kd_comment  = _key_comment
+        , kd_secret   = bs
+        }
 
 name' :: String -> Name
 name' = either (error.show) id . name

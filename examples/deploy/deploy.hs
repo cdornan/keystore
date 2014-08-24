@@ -40,7 +40,8 @@ main =
               _    -> verify_ks True ic_ro
             case cli_command of
               Create                      -> error "main: Initialise"
-              Rotate          mbh mbs mbk -> rotate  ic    $ key_prededicate mbh mbs mbk
+              Rotate          mbh mbs mbk -> rotate          ic $ key_prededicate mbh mbs mbk
+              RotateSmart     mbh mbs mbk -> rotateIfChanged ic $ key_prededicate mbh mbs mbk
               Deploy          mb hst      -> deploy  ic_ro hst                        >>= write mb
               Sign                        -> sign_ks ic_ro
               Verify                      -> T.putStrLn "the keystore matches the signature"

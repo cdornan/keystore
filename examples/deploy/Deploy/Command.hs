@@ -23,6 +23,7 @@ data CLI =
 data Command
     = Create
     | Rotate        (Maybe HostID)  (Maybe SectionID)  (Maybe KeyID)
+    | RotateSmart   (Maybe HostID)  (Maybe SectionID)  (Maybe KeyID)
     | Deploy        (Maybe FilePath) HostID
     | Sign
     | Verify
@@ -58,7 +59,8 @@ p_command :: Parser Command
 p_command =
     subparser
      $  command "create"                    pi_create
-     <> command "rotate"                    pi_rotate_key
+     <> command "rotate"                   (pi_rotate_key False)
+     <> command "rotate-smart"             (pi_rotate_key True )
      <> command "deploy"                    pi_deploy
      <> command "sign"                      pi_sign
      <> command "verify"                    pi_verify
@@ -76,15 +78,15 @@ pi_create =
         (helper <*> (pure Create))
         (progDesc "create a new keystore")
 
-pi_rotate_key :: ParserInfo Command
-pi_rotate_key =
+pi_rotate_key :: Bool -> ParserInfo Command
+pi_rotate_key sm =
     h_info
         (helper <*>
-            (Rotate
+            ((if sm then RotateSmart else Rotate)
                 <$> optional p_host
                 <*> optional p_section
                 <*> optional p_key))
-        (progDesc "rotate a key")
+        (progDesc $ if sm then "rotate keys, but only if they have changed" else "rotate keys")
 
 pi_deploy :: ParserInfo Command
 pi_deploy =

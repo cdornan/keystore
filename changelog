@@ -62,3 +62,7 @@
 0.5.0.3 Chris Dornan <chrisd@irisconnect.co.uk> 2014-07-30
 	* fix key-formatting bug (gratuitious insertion of double '/'s before the
 	  version number)
+
+0.5.0.4 Chris Dornan <chrisd@irisconnect.co.uk> 2014-08-24
+	* improve diagnostics for internally used Sections.keySection
+	* add roateIfChanged to Sections (squashes vacuous rotations)

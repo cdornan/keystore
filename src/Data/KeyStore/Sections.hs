@@ -332,7 +332,7 @@ key_section h k = either oops id $ keySection h k
   where
     oops dg = error $ "key_section: " ++ encode h ++ ": " ++ encode k ++ ": " ++ show dg
 
--- | Rerurn the section that a host sores a given key in, returning a
+-- | Return the section that a host stores a given key in, returning a
 -- failure diagnostic if the host does not keep such a key in the given
 -- 'Section' model.
 keySection :: Sections h s k => h -> k -> Retrieve s
@@ -352,10 +352,12 @@ rotate' ch ic mb_h s k = do
     -- iff ch then compare the new value with the old
     ok <- case ch of
       True  -> do
-        -- if key has not changed then squash the rotation
+        -- if key has not changed, or the secret text is not available
+        -- then squash the rotation
         mbkds <- map key2KeyData <$> locateKeys ic (mks k) g_nm
         case mbkds of
-          Just kd':_ | kd==kd' -> return False
+          Just kd':_ | kd==kd' -> return False    -- the key has not changes
+          Nothing :_           -> return False    -- secret not accessible to compare
           _                    -> return True
       False ->
         return True

@@ -4,7 +4,7 @@ ks
 *.log
 .prep
 cs
-
+*.dat
 ./__*
 
 state

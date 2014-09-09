@@ -5,7 +5,9 @@
 {-# LANGUAGE BangPatterns               #-}
 
 module Data.KeyStore.KS.Crypto
-  ( defaultEncryptedCopyKS
+  ( sizeAesIV
+  , sizeOAE
+  , defaultEncryptedCopyKS
   , saveKS
   , restoreKS
   , mkAESKeyKS
@@ -28,6 +30,7 @@ module Data.KeyStore.KS.Crypto
   , randomAESKeyKS
   , randomIVKS
   , hashKS
+  , defaultHashParams
   , defaultHashParamsKS
   , hashKS_
   , generateKeysKS
@@ -61,9 +64,9 @@ import           Crypto.PubKey.MaskGenFunction
 import           Crypto.Cipher.AES
 
 
-size_aes_iv, size_oae :: Octets
-size_aes_iv = 16
-size_oae    = 256
+sizeAesIV, sizeOAE :: Octets
+sizeAesIV = 16
+sizeOAE   = 256
 
 
 --
@@ -193,8 +196,8 @@ decodeRSASecretData (RSASecretBytes dat) = e2ks $ decodeRSASecretData_ $ _Binary
 
 decodeRSASecretData_ :: B.ByteString -> E RSASecretData
 decodeRSASecretData_ dat0 =
- do (eky,dat1) <- slice size_oae    dat0
-    (iv ,edat) <- slice size_aes_iv dat1
+ do (eky,dat1) <- slice sizeOAE   dat0
+    (iv ,edat) <- slice sizeAesIV dat1
     return
         RSASecretData
             { _rsd_encrypted_key    = RSAEncryptedKey $ Binary eky
@@ -280,7 +283,7 @@ randomAESKeyKS :: Cipher -> KS AESKey
 randomAESKeyKS cip = randomBytes (keyWidth cip) (AESKey . Binary)
 
 randomIVKS :: KS IV
-randomIVKS = randomBytes size_aes_iv (IV . Binary)
+randomIVKS = randomBytes sizeAesIV (IV . Binary)
 
 
 --
@@ -290,6 +293,9 @@ randomIVKS = randomBytes size_aes_iv (IV . Binary)
 
 hashKS :: ClearText -> KS Hash
 hashKS ct = flip hashKS_ ct <$> defaultHashParamsKS
+
+defaultHashParams :: HashDescription
+defaultHashParams = trun defaultHashParamsKS
 
 defaultHashParamsKS :: KS HashDescription
 defaultHashParamsKS =

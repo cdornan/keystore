@@ -32,7 +32,7 @@ flexible, secure and well-typed deployment scripts.
         and some arbitrary textual information (the 'comment') may be associated
         with a key and accessible without recourse to the key or password needed
         to access the secret information.
-      + *PKS*: the seret may be a RSA provate key with the public key stored
+      + *PKS*: the seret may be a RSA private key with the public key stored
         separately in the cler.
       + *MFA*: a secret may be protected with multiple named keys, all of which
         will be needed to recover the secret text.
@@ -67,8 +67,8 @@ flexible, secure and well-typed deployment scripts.
       + *External crypto operations*: keys in the keystore can be used to sign
         or encrypt external obejcts (provided they can be loaded into memory).
 
-  * Perhaps apropriately, the keystore package has several layers. Most users
-    will probably need only the top "batteries-included" layer:
+  * The keystore package has several layers. Most users will probably need
+    only the top "batteries-included" layer:
 
       + `Data.KeyStore.Sections`: this provides a high-level model that allows
         a flexible hierarchical keystore to be set up relatively easily.
@@ -76,6 +76,9 @@ flexible, secure and well-typed deployment scripts.
       + `Data.KeyStore.CLI` : This provides a stanalone program for inspecting
         and editing your keystores. It can also be embedded into your own
         deployment app. See the `deploy` example for details.
+      + `Data.KeyStore.PasswordManager` provides a password manager which each
+        user can use to setup their own local password store for holding the
+        deployment passwords and session tokens used to autheticate the server.
       + `Data.KeyStore.IO`: this library provides general programatic access to
         a keystore through `IO` primitives. See the source code for the `Sections`
         for an example of this module in use.
@@ -84,15 +87,6 @@ flexible, secure and well-typed deployment scripts.
         the `IO` for an exteded example this system in action.
       + `Data.KeyStore.Types`: This provides access to keystores at the types
         level.
-
-
-0.5 Migration instructions
---------------------------
-
-The formation of the names used in 'Data.Keystore.Sections' derived keystores
-has changed to fix an issue (#3) that barred hosts, sections and key identifiers
-from being prefixes of each other. See the changelog for details, especially
-on how to ensure that an existing Sections-based keystore gets migrated properly.
 
 
 Launch Instructions
@@ -108,32 +102,35 @@ for inspecting and editing keystores.
 ````bash
 ks --help
 ````
-Will list the commands but they are no good to you because, apart from the
+will list the commands but they are no good to you because, apart from the
 trivial ones (like `version`), they need a keystore to operate on.
 
 The `deploy` example can get us going.
 
 Generally the first step in setting up a keystore is to set up all of the
 master passwords it will need for each of its sections in the environment
-using your favourite random password generator. Your deployment app should
+using your favourite random password generator. Your deployment app could
 provide a template for this:
-
 ````bash
 deploy sample-script
 ````
-will in the current version (0.4.0.0) print this:
-
+will in the current version (0.5.1.0) print this:
 ````bash
-export KEY_pw_top=pw_top;
-export KEY_pw_signing=pw_signing;
-export KEY_pw_eu_admin=pw_eu_admin;
-export KEY_pw_eu_deploy=pw_eu_deploy;
-export KEY_pw_eu_staging=pw_eu_staging;
-export KEY_pw_us_admin=pw_us_admin;
-export KEY_pw_us_deploy=pw_us_deploy;
-export KEY_pw_us_staging=pw_us_staging;
-export KEY_pw_dev=pw_dev;
+export KEY_pw_top=secret-top;
+export KEY_pw_signing=secret-signing;
+export KEY_pw_eu_admin=secret-eu_admin;
+export KEY_pw_eu_deploy=secret-eu_deploy;
+export KEY_pw_eu_staging=secret-eu_staging;
+export KEY_pw_us_admin=secret-us_admin;
+export KEY_pw_us_deploy=secret-us_deploy;
+export KEY_pw_us_staging=secret-us_staging;
+export KEY_pw_dev=secret-dev;
+export KEY_pw_session=secret-session;
 ````
+
+(These passwords can be more conveniently managed by the password manager
+described below, but we will describe that separately.)
+
 Having created the keystore you may want to clear down these definitions in
 which case it may be best to do this in a sub-shell.
 ````bash
@@ -208,7 +205,7 @@ nad so reports an error on the first one it tries to load.
 
 We need to set up the `live_eu` deployment password in our environment.
 ````bash
-export KEY_pw_eu_deploy=pw_eu_deploy;
+export KEY_pw_eu_deploy=secret-eu_deploy;
 ````
 
 Now if we list the key store we can see that just the keys we need have the
@@ -224,3 +221,215 @@ deploy deploy live_eu
 ````
 
 This should now print out an apropriatly filled out JSON configuration file.
+
+
+The Password Manager
+--------------------
+
+You can use the password manager to manage your deployment passwords and client
+session tokens. While the keystore is a shared store with hierarchical access,
+each user would maintain their own password store.
+
+The `Data.KeyStore.PasswordManager` module provides the API for the password
+manager which has been set up with the `deploy` example program.
+
+Each user sets up and manages their own password store with the `deploy pm`
+sub-commands (see `deploy pm --help`). To setup a store,
+
+````bash
+deploy pm setup
+````
+
+This will prompt you for a password and sets up an encrypted password store in
+the location configured by `deploy` (`pwstore.dat` in the current directory).
+The password is hashed to form a key which must be bound in the environment
+in the designated environment variable (`DEPLOY_MASTER` in this case, but it
+is configurable).
+
+By default the `setup` command runs an interactive shell with `DEPLOY_MASTER`
+setup so that your private encrypted store is accessible. Once you exit this
+shell the key will no longer be bound in the environmant and the encrypted
+store will be insaccessible. To access the store again, user the `login`
+command, which will prompt for a password and launch another interactive
+shell with the `DEPLOY_MASTER` setup with the requisite encryption key:
+
+````bash
+deploy pm setup
+````
+
+The password manager has been set up with a corresponding sample script for
+loading the keystore.
+
+````bash
+deploy pm sample-load-script
+````
+
+The current version (0.5.1.0) displays this sample script:
+````bash
+deploy pm comment 'loaded by the sample script' ;
+deploy pm load top          secret-top           # 'top key: accesses everything' ;
+deploy pm load signing      secret-signing       # 'keystore signing key'       ;
+deploy pm load eu_admin     secret-eu_admin      # 'eu admin keys'              ;
+deploy pm load eu_deploy    secret-eu_deploy     # 'eu deploy keys'             ;
+deploy pm load eu_staging   secret-eu_staging    # 'eu staging deployment keys' ;
+deploy pm load us_admin     secret-us_admin      # 'us admin keys'              ;
+deploy pm load us_deploy    secret-us_deploy     # 'us deploy keys'             ;
+deploy pm load us_staging   secret-us_staging    # 'us staging keys'            ;
+deploy pm load dev          secret-dev           # 'dev deployment keys'        ;
+deploy pm load session      secret-session       # 'client sessions tokens'     ;
+````
+N.B. Everything after the '#' is treated as a comment and is ignored.
+
+(N.B. The sample passwords have changed from earlier versions of this package,
+so if you have a sample keystore created by an earlier version you will have to
+adjust this script to use the old passwords to access the old keystore.)
+
+Note that each password has been assigned a password manager name, corresponding
+to the environment variable it is managing. (We could have used the environment
+variable names like `KEY_pw_top` instead of `top` but the environment variable
+names are typically unwieldy to ensure they dont colide with any other environment
+variables being used by the system.)
+
+The quickest way to get going is probably this:
+````bash
+deploy pm sample-load-script | bash
+````
+
+Now you can try a deployment:
+````bash
+deploy deploy dev
+````
+
+This works without the need to bind `KEY_pw_dev` in the environment: before
+loading the keystore the deployment software calls out to the password manager
+to collect the passwords it needs. The password manager uses the `DEPLOY_MASTER`
+key bound in the environment to decrypt the password store and bind the
+individual passwords into the environment for the deployment scripts to pick up.
+(Because this is all done in a sub-process they will all be discarded once the
+process that executed the `deploy` command has completed.)
+
+
+Priming Passwords
+-----------------
+
+This can all become too convenient! It is easy to imagine logging into the
+password manager to test a development server and accidentally deploying
+a production server. The help protect against such accidents the password
+manager can be told that certain passwords are to be considered special and
+are not to be loaded into the environment by default --
+they will need to be primed for use.
+
+The following will not work by itself, for example:
+````bash
+deploy deploy live_eu
+````
+
+Of course, you could set the export `KEY_pw_eu_deploy` manually as above, but
+you could also tell the password manager that you want to use it before issuing
+the deploy command.
+````bash
+deploy pm prime eu_deploy
+deploy deploy live_eu
+````
+
+Sometimes you may wish to prime all of the passwords -- to rotate them all, for
+example:
+````bash
+deploy pm prime-all
+deploy rotate
+deploy sign
+````
+
+If you change your mind you can also un-prime them:
+````bash
+deploy pm prime-all -u
+````
+
+
+Inspecting Passwords
+--------------------
+
+The following commands are available to inspect the state of session and the
+store.
+
+````bash
+deploy pm status
+deploy pm passwords
+deploy pm info top
+````
+
+The `status` command gives the status of the login session; the `passwords`
+command lists all of the passwords (note the `-`s in the second column for
+one-shot passwords that need priming, which turn into '+'s on priming); the
+`info` command provides information on an individual passwords, including
+textual notes.
+
+
+Sessions
+--------
+
+One of the motivation for the password manager was to manage sessions tokens
+generated by the server for the client to authenticate with. The `session`
+password was created for this purpose. The only way that session passwords
+differ from ordinary passwords (apart from the fact thet they will be
+used by a server cleint rather than deployment scripts) is that
+the session passwords can each store multiple tokens, and these tokens get
+parsed to extract session names. Each client must provide the parsers as
+part of the password manager configuration, and the `deploy` session parsers
+assume that everything before the first `:` in the token identifies the
+session.
+
+The sample script loaded a single session
+````bash
+deploy pm load session      secret-session
+````
+
+As there is no `:` the whole token is assumed to name the session. The sessions
+can be listed with the `sessions` command:
+````bash
+deploy pm sessions
+````
+which should produce something like this:
+````
+secret-session     2014-09-08 19:50 [ACTIVE]
+````
+
+If you load another token, with a different name then that session will be added
+and selected as the current session, but the original session gets stacked.
+````bash
+deploy pm load master:very-secret
+````
+
+If we look at the sessions,
+````bash
+deploy pm sessions
+````
+we see two, with the new `master` session selected:
+````
+master           - 2014-09-08 20:55 [ACTIVE]
+secret-session     2014-09-08 19:50
+````
+
+We can try our sample client:
+````bash
+deploy client
+````
+which produces
+````
+session-token=>NONE
+````
+
+The problem is that the token parser has decided to marke this session as
+a one-shot password that needs to be primed each time it is used. The `-` above
+was indicating this.
+
+We can try our sample client:
+````bash
+deploy prime session
+deploy client
+````
+which produces
+````
+session-token=>master:very-secret
+````
+Better.

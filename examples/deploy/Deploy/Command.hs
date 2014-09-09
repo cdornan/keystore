@@ -24,16 +24,18 @@ data Command
     = Create
     | Rotate        (Maybe HostID)  (Maybe SectionID)  (Maybe KeyID)
     | RotateSmart   (Maybe HostID)  (Maybe SectionID)  (Maybe KeyID)
-    | Deploy        (Maybe FilePath) HostID
+    | Deploy       Bool (Maybe FilePath) HostID
+    | Client
     | Sign
     | Verify
     | ListHosts
-    | InfoKey       (Maybe KeyID    )
-    | InfoSection   (Maybe SectionID)
+    | InfoKey           (Maybe KeyID    )
+    | InfoSection       (Maybe SectionID)
     | SecretScript
     | PublicScript
     | SampleScript
-    | KS            [String]
+    | KS [String]
+    | PM [String]
     deriving (Show)
 
 parseCLI :: IO CLI
@@ -41,6 +43,7 @@ parseCLI = do
   args <- getArgs
   case span is_flg args of
     (flgs,"ks":args') -> runParse (pi_cli $ p_ks args') flgs
+    (flgs,"pm":args') -> runParse (pi_cli $ p_pm args') flgs
     _                 -> runParse (pi_cli   p_cli     ) args
 
 pi_cli :: Parser CLI -> ParserInfo CLI
@@ -52,6 +55,9 @@ pi_cli psr =
 p_ks :: [String] -> Parser CLI
 p_ks args = CLI <$> paramsParser <*> pure (KS args)
 
+p_pm :: [String] -> Parser CLI
+p_pm args = CLI <$> paramsParser <*> pure (PM args)
+
 p_cli :: Parser CLI
 p_cli     = CLI <$> paramsParser <*> p_command
 
@@ -62,6 +68,7 @@ p_command =
      <> command "rotate"                   (pi_rotate_key False)
      <> command "rotate-smart"             (pi_rotate_key True )
      <> command "deploy"                    pi_deploy
+     <> command "client"                    pi_client
      <> command "sign"                      pi_sign
      <> command "verify"                    pi_verify
      <> command "list-hosts"                pi_list_hosts
@@ -69,8 +76,9 @@ p_command =
      <> command "info-section"              pi_info_section
      <> command "secret-script"             pi_secret_script
      <> command "public-script"             pi_public_script
-     <> command "sample-script"             pi_sample_script
+     <> command "sample-load-script"        pi_sample_script
      <> command "ks"                        pi_ks_args
+     <> command "pm"                        pi_pm_args
 
 pi_create :: ParserInfo Command
 pi_create =
@@ -91,9 +99,17 @@ pi_rotate_key sm =
 pi_deploy :: ParserInfo Command
 pi_deploy =
     h_info
-        (helper <*> (Deploy <$> optional p_out <*> p_host_arg))
-        (progDesc $ "deploy a configuration file for s host " ++
+        (helper <*> (Deploy <$> p_shell_flg <*> optional p_out <*> p_host_arg))
+        (progDesc $ "deploy a configuration file for a host " ++
                         "(here merely generating the JSON configuration file)")
+
+pi_client :: ParserInfo Command
+pi_client =
+    h_info
+        (helper <*> (pure Client))
+        (progDesc $ "run a mock client " ++
+                        "(here merely displays the session token)")
+
 
 pi_sign :: ParserInfo Command
 pi_sign =
@@ -122,7 +138,7 @@ pi_info_key =
 pi_info_section :: ParserInfo Command
 pi_info_section =
     h_info
-        (helper <*> (InfoSection <$> optional p_section))
+        (helper <*> (InfoSection <$> optional p_a_section))
         (progDesc "get the gen on the keystore sections")
 
 pi_secret_script :: ParserInfo Command
@@ -146,8 +162,20 @@ pi_sample_script =
 pi_ks_args :: ParserInfo Command
 pi_ks_args =
     h_info
-        (helper <*> (KS <$> many p_ks_arg))
+        (helper <*> (KS <$> many p_arg))
         (progDesc "run a ks command (see 'ks --help' for details)")
+
+pi_pm_args :: ParserInfo Command
+pi_pm_args =
+    h_info
+        (helper <*> (KS <$> many p_arg))
+        (progDesc "run a pm command (see 'pm --help' for details)")
+
+p_shell_flg :: Parser Bool
+p_shell_flg =
+    switch
+        (long    "shell"        <>
+         help    "launch a shell with the deploy passwords setup in their environment variables")
 
 p_host_arg :: Parser HostID
 p_host_arg =
@@ -171,26 +199,32 @@ p_section =
         <> reader (maybe (fail "section not recognised") return . decode)
         <> help "a section ID"
 
+p_a_section :: Parser SectionID
+p_a_section =
+    argument decode
+        $  metavar "SECTION"
+        <> help    "a section ID"
+
 p_key :: Parser KeyID
 p_key =
     nullOption
-        $  long "key"
-        <> metavar "KEY"
+        $  long     "key"
+        <> metavar  "KEY"
         <> reader (maybe (fail "key not recognised") return . decode)
-        <> help "a key ID"
+        <> help     "a key ID"
 
 p_out :: Parser FilePath
 p_out =
     strOption
-        $  long "out"
-        <> metavar "FILE"
-        <> help "output file"
+        $  long     "out"
+        <> metavar  "FILE"
+        <> help     "output file"
 
-p_ks_arg :: Parser String
-p_ks_arg =
+p_arg :: Parser String
+p_arg =
     argument Just
-        $  metavar  "KS-ARG"
-        <> help     "a ks command argument"
+        $  metavar  "ARG"
+        <> help     "a sub-command argument"
 
 h_info :: Parser a -> InfoMod a -> ParserInfo a
 h_info pr = info (helper <*> pr)

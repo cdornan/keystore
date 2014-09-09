@@ -10,15 +10,13 @@ module Data.KeyStore.CLI
 import           Data.KeyStore.IO
 import           Data.KeyStore.KS.Opt
 import           Data.KeyStore.CLI.Command
+import           Data.KeyStore.Version
 import qualified Data.Text.IO                   as T
 import qualified Data.ByteString.Char8          as B
 import           Control.Applicative
 import           Control.Monad
 import           System.Exit
 
-
-version :: String
-version = "0.5.0.4"
 
 cli :: IO ()
 cli = parseCLI >>= command Nothing
@@ -80,7 +78,7 @@ command mb_cp CLI{..} =
 
 
 
-    oops  = error "command: this ic should ne be used"
+    oops  = error "command: this ic should not be used"
 
 create :: IC
        -> Name

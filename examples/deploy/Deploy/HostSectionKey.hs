@@ -36,6 +36,7 @@ data SectionID
   | S_us_deploy
   | S_us_staging
   | S_dev
+  | S_session
   deriving (Show, Ord, Eq, Bounded, Enum)
 
 dev, staging, deploy, admin :: SectionID -> Bool
@@ -106,6 +107,7 @@ super_sections s =
     S_us_deploy  -> [S_us_admin               ]
     S_us_staging -> [S_us_deploy              ]
     S_dev        -> [S_eu_staging,S_us_staging]
+    S_session    -> [S_dev                    ]
 
 key_is_host_indexed :: KeyID -> Maybe (HostID->Bool)
 key_is_host_indexed k =
@@ -193,6 +195,7 @@ describe_section s =
     S_us_deploy  -> "has access to all of the keys needed for the 'us' live server deployment"
     S_us_staging -> "has access to all of the keys needed for the 'us' staging server deployment"
     S_dev        -> "contains all of the keys needed to deploy a development server"
+    S_session    -> "this section does not contain any keys (the section is needed for the password manager)"
 
 is_ssl :: HostID -> Bool
 is_ssl h =
@@ -202,3 +205,48 @@ is_ssl h =
     H_live_us    -> True
     H_staging_us -> True
     H_dev        -> False
+
+
+--
+-- Password Manager Definitions
+--
+
+instance PW SectionID where
+
+  pwName = PasswordName . T.pack . encode
+
+  isSession sid = case sid of
+    S_session -> Just extract_ssn
+    _         -> Nothing
+
+  isOneShot sid = case sid of
+    S_top       -> True
+    S_eu_admin  -> True
+    S_eu_deploy -> True
+    S_us_admin  -> True
+    S_us_deploy -> True
+    _           -> False
+
+  summarize s =
+    case s of
+      S_top        -> "top key: accesses everything"
+      S_signing    -> "keystore signing key"
+      S_eu_admin   -> "eu admin keys"
+      S_eu_deploy  -> "eu deploy keys"
+      S_eu_staging -> "eu staging deployment keys"
+      S_us_admin   -> "us admin keys"
+      S_us_deploy  -> "us deploy keys"
+      S_us_staging -> "us staging keys"
+      S_dev        -> "dev deployment keys"
+      S_session    -> "client sessions tokens"
+
+  describe = describe_section
+
+extract_ssn :: PasswordText -> Either String SessionDescriptor
+extract_ssn (PasswordText pwt) = Right $
+  SessionDescriptor
+    { _sd_name      = snm
+    , _sd_isOneShot = snm=="master"
+    }
+  where
+    snm = SessionName $ T.takeWhile (/= ':') pwt

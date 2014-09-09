@@ -63,7 +63,8 @@ import           Control.Applicative
 import           Control.Exception
 import           Control.Monad
 import           System.Directory
-import           System.Environment
+import qualified System.Environment                       as E
+import           System.SetEnv
 import           System.Exit
 import           System.IO
 import           System.Locale
@@ -710,7 +711,7 @@ not_logged_in_err pmc@PMConfig{..} = do
   error $ if ex then _pmc_password_msg else _pmc_keystore_msg
 
 get_key' :: PW p => PMConfig p -> IO (Maybe AESKey)
-get_key' PMConfig{..} = fmap mk_aek' <$> lookupEnv var
+get_key' PMConfig{..} = fmap mk_aek' <$> E.lookupEnv var
   where
     var = T.unpack $ _EnvVar _pmc_env_var
 
@@ -1006,14 +1007,14 @@ run_parse pinfo args =
   case execParserPure (prefs idm) pinfo args of
     Success a -> return a
     Failure failure -> do
-      progn <- getProgName
+      progn <- E.getProgName
       let (msg, exit) = execFailure failure progn
       case exit of
         ExitSuccess -> putStrLn msg
         _           -> hPutStrLn stderr msg
       exitWith exit
     CompletionInvoked compl -> do
-      progn <- getProgName
+      progn <- E.getProgName
       msg   <- execCompletion compl progn
       putStr msg
       exitWith ExitSuccess

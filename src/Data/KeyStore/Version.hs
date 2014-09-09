@@ -6,4 +6,4 @@ version = show a ++ "." ++ show b ++ "." ++ show c ++ "." ++ show d
     (a,b,c,d) = versionTuple
 
 versionTuple :: (Int,Int,Int,Int)
-versionTuple = (0,5,1,0)
+versionTuple = (0,5,1,1)

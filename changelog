@@ -71,3 +71,6 @@
 	* fix the repo location in the cabal file
 	* fix smart rotate to not rotate keys it cannot access
 	* add password manager
+
+0.5.1.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-09-08
+	* fixsetEnv usage to work with GHCs 7.6.3 & 7.8.3

@@ -433,3 +433,39 @@ which produces
 session-token=>master:very-secret
 ````
 Better.
+
+
+Importing Password Stores
+-------------------------
+
+You can also import the contents of one password store into another. To load
+the above example passwords from an example password store:
+
+````bash
+deploy pm import examples/deploy/example-pwstore.dat deploy
+````
+
+The imported store's comment, passwords and sessions will be inserted into
+current store, replace any like-named passwords and sessions and leaving the
+rest.  It can be used to securely circulate a password set and to change the
+password of a store (by create a new store under the new password, importing
+the old passwords and deleting the old store).
+
+
+Dynamic Passwords
+-----------------
+
+In addition to setting up a static list of passwords you may need to
+manage a dynamic class of passwords, where you do not know the number
+of passwords or their names. To do this, specify a '+' in front of the
+password name when loading it. For example,
+
+````
+deploy pm load +john secret-of-john
+````
+
+These passwords will get loaded into the environment when the passwords
+get collected according to the password store's configuration. The name
+of the pasword can be the same as any of your named static passwords
+without confusion. It can be listed with `passwords-plus` inspected
+with `info` and deleted with `delete`.

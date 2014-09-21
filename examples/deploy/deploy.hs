@@ -15,8 +15,10 @@ import qualified Data.ByteString.Char8          as B
 import qualified Data.ByteString.Lazy.Char8     as LBS
 import qualified Data.Text                      as T
 import qualified Data.Text.IO                   as T
+import           Data.List
 import           System.IO
 import           System.Environment
+import           System.SetEnv
 import           System.Process
 import           Control.Applicative
 import           Control.Exception
@@ -38,6 +40,7 @@ pmc =
     , _pmc_allow_dumps    = True
     , _pmc_dump_prefix    = dump_pfx
     , _pmc_sample_script  = Just $ defaultSampleScript (PW_ :: PW_ SectionID) dump_pfx
+    , _pmc_plus_env_var   = \(PasswordName nm) -> Just $ EnvVar $ T.concat ["DEPLOY_PW_",nm]
     }
   where
     dump_pfx = "deploy pm"
@@ -117,7 +120,11 @@ interactive_shell :: IO ()
 interactive_shell = do
   sh <- maybe "/bin/bash" id <$> lookupEnv "SHELL"
   putStrLn $ "launching password-manager shell => " ++ sh
-  callProcess sh ["-i"]
+  case "zsh" `isInfixOf` sh of
+    True  -> do
+      setEnv "ZDOTDIR" "examples/deploy/zshenv"
+      callProcess sh ["-i"]
+    False -> callProcess sh ["-i"]
   putStrLn "password-manager shell done"
 
 write :: Maybe FilePath -> LBS.ByteString -> IO ()

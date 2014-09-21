@@ -4,7 +4,7 @@ ks
 *.log
 .prep
 cs
-*.dat
+pwstore.dat
 ./__*
 
 state
@@ -26,6 +26,7 @@ Icon
 .*
 !.gitignore
 !.ghci
+!.zshrc
 *~
 dist
 cabal-dev

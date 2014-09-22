@@ -73,4 +73,15 @@
 	* add password manager
 
 0.5.1.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-09-08
-	* fixsetEnv usage to work with GHCs 7.6.3 & 7.8.3
+	* fix setEnv usage to work with GHCs 7.6.3 & 7.8.3
+
+0.6.0.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-09-21
+	* add dynamic passwords to the passowrd manager
+	* add password manager importing
+	* fix bugs in the PasswordManager `amLoggedIn` and `passwordValid`
+	  (they were throwing exceptions rather than returning False)
+	* add support for shell prompts to the password manager
+	* expose the optparse-applicative PasswordManager CLI parser and abstract
+	  syntax for cleaner embedding in optparse-applicative parsers
+    * hope dependent pacakges have stopped breaking the Hackage build
+

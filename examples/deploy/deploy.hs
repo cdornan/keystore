@@ -18,6 +18,7 @@ import qualified Data.Text.IO                   as T
 import           Data.List
 import           System.IO
 import           System.Environment
+import qualified System.SetEnv                  as SE
 import           System.Process
 import           Control.Applicative
 import           Control.Exception
@@ -121,7 +122,7 @@ interactive_shell = do
   putStrLn $ "launching password-manager shell => " ++ sh
   case "zsh" `isInfixOf` sh of
     True  -> do
-      setEnv "ZDOTDIR" "examples/deploy/zshenv"
+      SE.setEnv "ZDOTDIR" "examples/deploy/zshenv"
       callProcess sh ["-i"]
     False -> callProcess sh ["-i"]
   putStrLn "password-manager shell done"

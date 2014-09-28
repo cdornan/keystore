@@ -85,3 +85,6 @@
 	  syntax for cleaner embedding in optparse-applicative parsers
     * hope dependent pacakges have stopped breaking the Hackage build
 
+0.6.1.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-09-21
+	* expose ks optparse-applicative CLI parser
+	* adapt 'deploy' example to use 'ks' and 'pm' optparse-applicative parsers

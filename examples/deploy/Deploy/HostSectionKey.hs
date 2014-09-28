@@ -170,8 +170,7 @@ ourSettings = [RS.r|
 |]
 
 describe_key :: KeyID -> String
-describe_key k =
-  case k of
+describe_key k = case k of
     K_admin_init_pw -> "the starting password for the administrator"
     K_super_api     -> "the 'super_api' key will authenticate any request"
     K_api           -> "the api key is needed to make requests when the client has not credentials (e.g., to login)"
@@ -182,8 +181,7 @@ describe_key k =
     K_ssl           -> "the SSL Host key and certificate"
 
 describe_section :: SectionID -> String
-describe_section s =
-  case s of
+describe_section s = case s of
     S_top        -> "the top section has access to all keys"
     S_signing    -> "just contains the keystore signing key"
     S_eu_admin   -> "contains adminsitrative keys for the 'eu' live server not required for deployment"
@@ -198,8 +196,7 @@ describe_section s =
     S_session    -> "this section does not contain any keys (the section is needed for the password manager)"
 
 is_ssl :: HostID -> Bool
-is_ssl h =
-  case h of
+is_ssl h = case h of
     H_live_eu    -> True
     H_staging_eu -> True
     H_live_us    -> True
@@ -227,18 +224,17 @@ instance PW SectionID where
     S_us_deploy -> True
     _           -> False
 
-  summarize s =
-    case s of
-      S_top        -> "top key: accesses everything"
-      S_signing    -> "keystore signing key"
-      S_eu_admin   -> "eu admin keys"
-      S_eu_deploy  -> "eu deploy keys"
-      S_eu_staging -> "eu staging deployment keys"
-      S_us_admin   -> "us admin keys"
-      S_us_deploy  -> "us deploy keys"
-      S_us_staging -> "us staging keys"
-      S_dev        -> "dev deployment keys"
-      S_session    -> "client sessions tokens"
+  summarize s = case s of
+    S_top        -> "top key: accesses everything"
+    S_signing    -> "keystore signing key"
+    S_eu_admin   -> "eu admin keys"
+    S_eu_deploy  -> "eu deploy keys"
+    S_eu_staging -> "eu staging deployment keys"
+    S_us_admin   -> "us admin keys"
+    S_us_deploy  -> "us deploy keys"
+    S_us_staging -> "us staging keys"
+    S_dev        -> "dev deployment keys"
+    S_session    -> "client sessions tokens"
 
   describe = describe_section
 

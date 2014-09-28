@@ -5,6 +5,12 @@ module Data.KeyStore.CLI
   , cli'
   , paramsParser
   , runParse
+  , cliInfo
+  , cliParser
+  , execute
+  , Command(..)
+  , CtxParams(..)
+  , CLI(..)
   ) where
 
 import           Data.KeyStore.IO
@@ -19,13 +25,13 @@ import           System.Exit
 
 
 cli :: IO ()
-cli = parseCLI >>= command Nothing
+cli = parseCLI >>= execute Nothing
 
 cli' :: Maybe CtxParams -> [String] -> IO ()
-cli' mb args = parseCLI' args >>= command mb
+cli' mb args = parseCLI' args >>= execute mb
 
-command :: Maybe CtxParams -> CLI -> IO ()
-command mb_cp CLI{..} =
+execute :: Maybe CtxParams -> CLI -> IO ()
+execute mb_cp CLI{..} =
  do ic <-
       case cli_command of
         Version      -> return oops

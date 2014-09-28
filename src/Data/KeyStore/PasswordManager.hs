@@ -49,7 +49,7 @@ module Data.KeyStore.PasswordManager
     -- password manager CLI internals
     , passwordManager'
     , PMCommand
-    , parseCommand
+    , pmCommandParser
     ) where
 
 import           Data.KeyStore.Types.PasswordStoreModel
@@ -167,7 +167,7 @@ defaultCollectConfig =
 
 -- | the password manager CLI: it just needs the config and command line
 passwordManager :: PW p => PMConfig p -> [String] -> IO ()
-passwordManager pmc args = parseCommand pmc args >>= passwordManager' pmc
+passwordManager pmc args = parsePMCommand pmc args >>= passwordManager' pmc
 
 -- | a sample 'HashDescription' generator to help with setting up 'PMConfig'
 defaultHashDescription :: Salt -> HashDescription
@@ -937,19 +937,19 @@ data PMCommand p
     deriving (Show)
 
 -- | parse a passwword manager command
-parseCommand :: PW p => PMConfig p -> [String] -> IO (PMCommand p)
-parseCommand pmc = run_parse $ command_info pmc
+parsePMCommand :: PW p => PMConfig p -> [String] -> IO (PMCommand p)
+parsePMCommand pmc = run_parse $ command_info pmc
 
 command_info :: PW p => PMConfig p -> ParserInfo (PMCommand p)
 command_info pmc =
-    O.info (helper <*> command_parser pmc)
+    O.info (helper <*> pmCommandParser pmc)
         (   fullDesc
          <> progDesc "a simple password manager"
          <> header "pm - sub-command for managing the password store"
          <> footer "'ks COMMAND --help' to get help on each command")
 
-command_parser :: PW p => PMConfig p -> Parser (PMCommand p)
-command_parser pmc =
+pmCommandParser :: PW p => PMConfig p -> Parser (PMCommand p)
+pmCommandParser pmc =
     subparser $ f $ g
      $  command "version"             pi_version
      <> command "setup"              (pi_setup            pmc)

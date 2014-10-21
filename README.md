@@ -8,7 +8,7 @@ VCS like almost everything else, but need to be organised and accessed
 while under lock and key. This is the problem that keystore is trying to solve:
 flexible, secure and well-typed deployment scripts.
 
-  * This module is written purely in Hakell and all of the cryptographic packages
+  * This package is written purely in Haskell and all of the cryptographic packages
     it relies upon are written in Haskell.
 
   * It stores everything in a JSON format that has proven to be stable. We can can

@@ -10,16 +10,19 @@ module Data.KeyStore.Sections
   , Sections(..)
   , SectionType(..)
   , KeyData(..)
+  , KeyDataMode(..)
   , KeyPredicate
   , RetrieveDg(..)
   , initialise
   , rotate
   , rotateIfChanged
+  , rotate_
   , retrieve
   , signKeystore
   , verifyKeystore
   , noKeys
   , allKeys
+  , listKeys
   , keyPrededicate
   , keyHelp
   , sectionHelp
@@ -27,6 +30,7 @@ module Data.KeyStore.Sections
   , publicKeySummary
   , locateKeys
   , keyName
+  , keyName_
   , passwordName
   )
   where
@@ -75,46 +79,50 @@ class (Code h, Code s, Code k) => Sections h s k
     , h -> s, k -> s
     , s -> k, h -> k
     where
-  hostDeploySection :: h -> s                           -- ^ the deployment section: for a given host,
+  hostDeploySection   :: h -> s                           -- ^ the deployment section: for a given host,
                                                         -- the starting section for locating the keys
                                                         -- during a deployment ('higher'/closer sections
                                                         -- taking priority)
-  sectionType       :: s -> SectionType                 -- ^ whether the section holds the top key for the
+  sectionType         :: s -> SectionType                 -- ^ whether the section holds the top key for the
                                                         -- keystore (i.e., keystore master key), the signing key
                                                         -- for the keystore or is a normal section containing
                                                         -- deployment keys
-  superSections     :: s -> [s]                         -- ^ the sections that get a copy of the master
+  superSections       :: s -> [s]                         -- ^ the sections that get a copy of the master
                                                         -- for this section (making all of its keys
                                                         -- available to them); N.B., the graph formed by this
                                                         -- this relationship over the sections must be acyclic
-  keyIsHostIndexed  :: k -> Maybe (h->Bool)             -- ^ if the key is host-indexed then the predicate
+  keyIsHostIndexed    :: k -> Maybe (h->Bool)             -- ^ if the key is host-indexed then the predicate
                                                         -- specifies the hosts that use this key
-  keyIsInSection    :: k -> s -> Bool                   -- ^ specifies which sections a key is resident in
-  getKeyData        :: Maybe h -> s -> k -> IO KeyData  -- ^ loads the data for a particular key
-  sectionSettings   :: Maybe s -> IO Settings           -- ^ loads the setting for a given settings
-  describeKey       :: k -> String                      -- ^ describes the key (for the ks help command)
-  describeSection   :: s -> String                      -- ^ describes the section (for the ks help command)
-  sectionPWEnvVar   :: s -> EnvVar                      -- ^ secifies the environment variable containing the
+  keyIsInSection      :: k -> s -> Bool                   -- ^ specifies which sections a key is resident in
+  getKeyData          :: Maybe h -> s -> k -> IO KeyData  -- ^ loads the data for a particular key
+  getKeyDataWithMode  :: Maybe h -> s -> k -> IO (KeyDataMode,KeyData)
+                                                          -- ^ loads the data for a particular key, returning mode
+  sectionSettings     :: Maybe s -> IO Settings           -- ^ loads the setting for a given settings
+  describeKey         :: k -> String                      -- ^ describes the key (for the ks help command)
+  describeSection     :: s -> String                      -- ^ describes the section (for the ks help command)
+  sectionPWEnvVar     :: s -> EnvVar                      -- ^ secifies the environment variable containing the
                                                         -- ^ master password/provate key for for the given section
 
-  sectionType           = const ST_keys
+  sectionType                   = const ST_keys
 
-  superSections         = const []
+  superSections                 = const []
 
-  keyIsHostIndexed      = const Nothing
+  keyIsHostIndexed              = const Nothing
 
-  keyIsInSection        = const $ const True
+  keyIsInSection                = const $ const True
 
-  getKeyData Nothing  s = get_kd $ encode s
-  getKeyData (Just h) _ = get_kd $ encode h
+  getKeyData          mb s k    = snd <$> getKeyDataWithMode mb s k
 
-  sectionSettings       = const $ return mempty
+  getKeyDataWithMode Nothing  s = get_kd $ encode s
+  getKeyDataWithMode (Just h) _ = get_kd $ encode h
 
-  describeKey         k = "The '" ++ encode k ++ "' key."
+  sectionSettings               = const $ return mempty
 
-  describeSection     s = "The '" ++ encode s ++ "' Section."
+  describeKey         k         = "The '" ++ encode k ++ "' key."
 
-  sectionPWEnvVar       = EnvVar . T.pack . ("KEY_pw_" ++) . encode
+  describeSection     s         = "The '" ++ encode s ++ "' Section."
+
+  sectionPWEnvVar               = EnvVar . T.pack . ("KEY_pw_" ++) . encode
 
 
 -- | Sections are used to hold the top (master) key for the keystore,
@@ -137,6 +145,11 @@ data KeyData =
     , kd_secret   :: B.ByteString
     }
   deriving (Show,Eq)
+
+data KeyDataMode
+  = KDM_static
+  | KDM_random
+  deriving (Bounded,Enum,Eq,Ord,Show)
 
 -- | One, many or all of the keys in a store may be rotated at a time.
 -- we use one of these to specify which keys are to be rotated.
@@ -174,22 +187,19 @@ initialise cp kp = do
 
 -- | Rotate in a set of keys specified by the predicate.
 rotate :: Sections h s k => IC -> KeyPredicate h s k -> IO ()
-rotate = rotate_ False
+rotate ic = rotate_ ic Nothing False
 
 -- | Rotate in a set of keys specified by the predicate, rotating each key only
 -- if it has changed: NB the check is contingent on the secret text being
 -- accessible; if the secret text is not accessible then the rotation will happen.
 rotateIfChanged :: Sections h s k => IC -> KeyPredicate h s k -> IO ()
-rotateIfChanged = rotate_ True
+rotateIfChanged ic = rotate_ ic Nothing True
 
 -- | Rotate in a set of keys specified by the predicate with the first argument
 -- controlling whether to squash duplicate rotations
-rotate_ :: Sections h s k => Bool -> IC -> KeyPredicate h s k -> IO ()
-rotate_ ch ic kp = reformat ic' $ sequence_ [ rotate' ch ic mb_h s k | (mb_h,s,k)<-host_keys++non_host_keys, kp mb_h s k ]
+rotate_ :: Sections h s k => IC -> Maybe KeyDataMode -> Bool -> KeyPredicate h s k -> IO ()
+rotate_ ic mb ch kp = reformat ic' $ sequence_ [ rotate' mb ch ic mb_h s k | (mb_h,s,k)<-listKeys kp ]
   where
-    host_keys     = [ (Just h ,s,k) | k<-[minBound..maxBound], Just isp<-[keyIsHostIndexed k], h<-[minBound..maxBound], isp h, let s = key_section h k ]
-    non_host_keys = [ (Nothing,s,k) | k<-[minBound..maxBound], Nothing <-[keyIsHostIndexed k], s<-[minBound..maxBound], keyIsInSection k s             ]
-
     ic' = kp_RFT kp ic
 
 -- | Retrieve the keys for a given host from the store. Note that the whole history for the given key is returned.
@@ -221,6 +231,13 @@ noKeys _ _ _ = False
 -- | A predicate specifying none of the keys in the keystore.
 allKeys :: KeyPredicate h s k
 allKeys _ _ _ = True
+
+-- | List all of the keys specified by a KeyPredicate
+listKeys :: Sections h s k => KeyPredicate h s k -> [(Maybe h,s,k)]
+listKeys kp = [ trp | trp@(mb_h,s,k)<-host_keys++non_host_keys, kp mb_h s k ]
+  where
+    host_keys     = [ (Just h ,s,k) | k<-[minBound..maxBound], Just isp<-[keyIsHostIndexed k], h<-[minBound..maxBound], isp h, let s = key_section h k ]
+    non_host_keys = [ (Nothing,s,k) | k<-[minBound..maxBound], Nothing <-[keyIsHostIndexed k], s<-[minBound..maxBound], keyIsInSection k s             ]
 
 -- | A utility for specifing a slice of the keys in the store, optionally specifying
 -- host section and key that should belong to the slice. (If the host is specified then
@@ -324,7 +341,14 @@ keyName h k = do
             Just hp | hp h      -> return $ Just h
                     | otherwise -> Left RDG_no_such_host_key
   s <- keySection h k
-  return $ key_nme mb_h s k
+  return $ keyName_ mb_h s k
+
+-- | Basic function for generating a key name from the host (if it is
+-- host indexex), section name and key id.
+keyName_ :: Sections h s k => Maybe h -> s -> k -> Name
+keyName_ mb_h s k = name' $ encode s ++ "/" ++ encode k ++ hst_sfx ++ "/"
+  where
+    hst_sfx = maybe "" (\h -> "/" ++ encode h) mb_h
 
 -- a wrapper on keySection used internally in functional contexts
 key_section :: Sections h s k => h -> k -> s
@@ -346,26 +370,32 @@ passwordName s = name' $ "/pw/" ++ encode s
 fmt :: Code a => (a->Bool) -> String
 fmt p  = unwords [ encode h | h<-[minBound..maxBound], p h ]
 
-rotate' :: Sections h s k => Bool -> IC -> Maybe h -> s -> k -> IO ()
-rotate' ch ic mb_h s k = do
-    kd@KeyData{..} <- getKeyData mb_h s k
-    -- iff ch then compare the new value with the old
-    ok <- case ch of
+rotate' :: Sections h s k => Maybe KeyDataMode -> Bool -> IC -> Maybe h -> s -> k -> IO ()
+rotate' mb ch ic mb_h s k = do
+    (kdm,kd@KeyData{..}) <- getKeyDataWithMode mb_h s k
+    -- if the KeyDataMode is specified but does not match the key's mode then squash the rotation
+    case maybe True (==kdm) mb of
       True  -> do
-        -- if key has not changed, or the secret text is not available
-        -- then squash the rotation
-        mbkds <- map key2KeyData <$> locateKeys ic (mks k) g_nm
-        case mbkds of
-          Just kd':_ | kd==kd' -> return False    -- the key has not changes
-          Nothing :_           -> return False    -- secret not accessible to compare
-          _                    -> return True
+        -- iff ch then compare the new value with the old
+        ok <- case ch of
+          True  -> do
+            -- if key has not changed, or the secret text is not available
+            -- then squash the rotation
+            mbkds <- map key2KeyData <$> locateKeys ic (mks k) g_nm
+            case mbkds of
+              Just kd':_ | kd==kd' -> return False    -- the key has not changes
+              Nothing :_           -> return False    -- secret not accessible to compare
+              _                    -> return True
+          False ->
+            return True
+        when ok $ do
+          n_nm <- unique_nme ic g_nm
+          putStrLn $ "rotating: " ++ _name n_nm
+          createKey ic n_nm kd_comment kd_identity Nothing $ Just kd_secret
       False ->
-        return True
-    when ok $ do
-      n_nm <- unique_nme ic g_nm
-      createKey ic n_nm kd_comment kd_identity Nothing $ Just kd_secret
+        return ()
   where
-    g_nm = key_nme mb_h s k
+    g_nm = keyName_ mb_h s k
 
     mks :: k -> SECTIONS h s k
     mks = const SECTIONS
@@ -439,11 +469,6 @@ sections _ = [minBound..maxBound]
 backup_password :: Sections h s k => IC -> s -> s -> IO ()
 backup_password ic s sv_s = secureKey ic (passwordName s) $ safeguard [sve_nme sv_s]
 
-key_nme :: Sections h s k => Maybe h -> s -> k -> Name
-key_nme mb_h s k = name' $ encode s ++ "/" ++ encode k ++ hst_sfx ++ "/"
-  where
-    hst_sfx = maybe "" (\h -> "/" ++ encode h) mb_h
-
 sgn_nme :: Sections h s k => s -> Name
 sgn_nme s = name' $ encode s ++ "/keystore_signing_key"
 
@@ -471,17 +496,19 @@ unique_nme' nms nm0 = headNote "unique_name'" c_nms
 the_keystore :: CtxParams -> FilePath
 the_keystore = maybe "keystore.json" id . cp_store
 
-get_kd :: Sections h s k => String -> k -> IO KeyData
+get_kd :: Sections h s k => String -> k -> IO (KeyDataMode,KeyData)
 get_kd sd k = do
   ide <- B.readFile $ fp "_id"
   cmt <- B.readFile $ fp "_cmt"
   sec <- B.readFile $ fp ""
   return
-    KeyData
-      { kd_identity = Identity $ T.pack $ B.unpack ide
-      , kd_comment  = Comment  $ T.pack $ B.unpack cmt
-      , kd_secret   = sec
-      }
+    ( KDM_static
+    , KeyData
+        { kd_identity = Identity $ T.pack $ B.unpack ide
+        , kd_comment  = Comment  $ T.pack $ B.unpack cmt
+        , kd_secret   = sec
+        }
+    )
   where
     fp sfx = sd </> encode k ++ sfx
 

@@ -1172,11 +1172,10 @@ p_unprime_sw =
 
 p_pw_id_opt :: PW p => Parser p
 p_pw_id_opt =
-    nullOption
+    option (eitherReader $ maybe (fail "password-id not recognised") return . parsePwName . PasswordName . T.pack)
         $  long    "id"
         <> short   'p'
         <> metavar "PASSWORD-ID"
-        <> reader  (maybe (fail "password-id not recognised") return . parsePwName . PasswordName . T.pack)
         <> help    "a password ID"
 
 -- arguments
@@ -1185,7 +1184,7 @@ p_comment :: Parser String
 p_comment = unwords <$> many p_word
 
 p_hash :: Parser ()
-p_hash = argument (\s->if s=="#" then Just () else Nothing) $ metavar "#"
+p_hash = argument (eitherReader $ \s->if s=="#" then return () else fail "# expected") $ metavar "#"
 
 h_info :: Parser a -> InfoMod a -> ParserInfo a
 h_info pr = O.info (helper <*> pr)
@@ -1195,19 +1194,19 @@ p_load_comment = const () <$> optional (p_hash <* p_comment)
 
 p_password_text :: PW p => Bool -> PMConfig p -> Parser PasswordText
 p_password_text hp pmc =
-    argument (Just . cond_hash hp pmc)
+    argument (eitherReader $ Right . cond_hash hp pmc)
         $  metavar "PASSWORD-TEXT"
         <> help    "the text of the password"
 
 p_pw_id :: PW p => Parser p
 p_pw_id =
-    argument (parsePwName . PasswordName . T.pack)
+    argument (eitherReader $ maybe (fail "bad password syntax") return . parsePwName . PasswordName . T.pack)
         $  metavar "PASSWORD-ID"
         <> help    "a password ID"
 
 p_pl_pw :: PW p => PMConfig p -> Parser PasswordName
 p_pl_pw pmc =
-    argument (parse_plus_pw pmc)
+    argument (eitherReader $ maybe (fail "bad +password syntax") return . parse_plus_pw pmc)
         $  metavar "+PASSWORD"
         <> help    "a dynamic (plus) password name"
 
@@ -1223,18 +1222,18 @@ p_secret_sw =
 
 p_session_name :: Parser SessionName
 p_session_name =
-    argument (Just . SessionName . T.pack)
+    argument (eitherReader $ Right . SessionName . T.pack)
         $  metavar "SESSION"
         <> help    "a session name"
 
 p_store_fp :: Parser FilePath
 p_store_fp =
-    argument Just
+    argument (eitherReader Right)
         $  metavar "STORE"
         <> help    "file containing the password store to import"
 
 p_word :: Parser String
-p_word = argument Just $ metavar "WORD"
+p_word = argument (eitherReader Right) $ metavar "WORD"
 
 -- run_parse
 
@@ -1244,10 +1243,10 @@ run_parse pinfo args =
     Success a -> return a
     Failure failure -> do
       progn <- E.getProgName
-      let (msg, exit) = execFailure failure progn
+      let (msg, exit, _) = execFailure failure progn
       case exit of
-        ExitSuccess -> putStrLn msg
-        _           -> hPutStrLn stderr msg
+        ExitSuccess -> putStrLn $ show msg
+        _           -> hPutStrLn stderr $ show msg
       exitWith exit
     CompletionInvoked compl -> do
       progn <- E.getProgName

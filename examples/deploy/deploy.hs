@@ -7,7 +7,10 @@ module Main (main) where
 
 import           Deploy.Deploy
 import           Deploy.Cmd
+
 import           Deploy.HostSectionKey
+import           Control.Applicative
+import           Control.Exception
 import           Data.KeyStore
 import           Data.API.Types
 import           Data.KeyStore                  as KS
@@ -18,10 +21,8 @@ import qualified Data.Text.IO                   as T
 import           Data.List
 import           System.IO
 import           System.Environment
-import qualified System.SetEnv                  as SE
 import           System.Process
-import           Control.Applicative
-import           Control.Exception
+import qualified System.SetEnv                  as SE
 
 
 ks_fp, ks_mac_fp :: FilePath

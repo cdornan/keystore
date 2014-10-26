@@ -1,5 +1,6 @@
 :set -isrc -iexamples/deploy -Wall
 :set -hide-package monads-tf
+:set -hide-package crypto-api
 :set -fno-warn-warnings-deprecations
 
 :seti -XOverloadedStrings

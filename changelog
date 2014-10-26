@@ -90,9 +90,12 @@
 	* adapt 'deploy' example to use 'ks' and 'pm' optparse-applicative parsers
 
 0.6.1.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-09-28
-    * fix deploy example for GHC 7.6.3 (use System.Setenv)
+	* fix deploy example for GHC 7.6.3 (use System.Setenv)
 
 0.6.2.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-10-19
-    * add listKeys and keyName_ to Sections
-    * add getKeyDataWithMode and rotate_ to Sections
-    * rotate reports the keys it is rotating
+	* add listKeys and keyName_ to Sections
+	* add getKeyDataWithMode and rotate_ to Sections
+	* rotate reports the keys it is rotating
+
+0.6.3.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-10-19
+	* switch to optprase-applicative 0.11

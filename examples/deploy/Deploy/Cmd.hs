@@ -168,38 +168,35 @@ p_shell_flg =
 
 p_host_arg :: Parser HostID
 p_host_arg =
-    argument decode
+    argument (eitherReader $ maybe (fail "host not recognised") return . decode)
         $  metavar "HOST"
         <> help    "a host ID"
 
 p_host :: Parser HostID
 p_host =
-    nullOption
+    option (eitherReader $ maybe (fail "host not recognised") return . decode)
         $  long "host"
         <> metavar "HOST"
-        <> reader (maybe (fail "host not recognised") return . decode)
         <> help    "a host ID"
 
 p_section :: Parser SectionID
 p_section =
-    nullOption
+    option (eitherReader $ maybe (fail "section not recognised") return . decode)
         $  long "section"
         <> metavar "SECTION"
-        <> reader (maybe (fail "section not recognised") return . decode)
         <> help "a section ID"
 
 p_a_section :: Parser SectionID
 p_a_section =
-    argument decode
+    argument (eitherReader $ maybe (fail "section not recognised") return . decode)
         $  metavar "SECTION"
         <> help    "a section ID"
 
 p_key :: Parser KeyID
 p_key =
-    nullOption
+    option (eitherReader $ maybe (fail "key not recognised") return . decode)
         $  long     "key"
         <> metavar  "KEY"
-        <> reader (maybe (fail "key not recognised") return . decode)
         <> help     "a key ID"
 
 p_out :: Parser FilePath

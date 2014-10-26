@@ -375,13 +375,13 @@ pi_delete =
 
 p_trigger_id  :: Parser TriggerID
 p_trigger_id =
-    argument (Just . TriggerID . T.pack)
+    argument (eitherReader $ Right . TriggerID . T.pack)
         $  metavar "TRIGGER"
         <> help    "name of the triggered settings"
 
 p_pattern :: Parser Pattern
 p_pattern =
-    argument (Just . mk)
+    argument (eitherReader $ Right . mk)
         $  metavar "REGEX"
         <> help    "POSIX regular expression for selecting matching keys"
   where
@@ -389,37 +389,34 @@ p_pattern =
 
 p_name :: Parser Name
 p_name =
-    argument (either (const Nothing) Just . name)
+    argument (eitherReader $ either (Left . showReason) Right . name)
         $  metavar "NAME"
         <> help    "name of the key"
 
 p_comment :: Parser Comment
 p_comment =
-    argument (Just . Comment . T.pack)
+    argument (eitherReader $ Right . Comment . T.pack)
         $  metavar "COMMENT"
         <> help    "comment text"
 
 p_identity :: Parser Identity
 p_identity = fmap (maybe "" id) $ optional $
-    argument (Just . Identity . T.pack)
+    argument (eitherReader $ Right . Identity . T.pack)
         $  metavar "KEY-IDENTITY"
         <> help    "identity of the key"
 
 p_env_var :: Parser EnvVar
 p_env_var =
-    argument (Just . fromString)
+    argument (eitherReader $ Right . fromString)
         $  metavar "ENV-VAR"
         <> help    "environment variable to hold the key's value"
 
 p_safeguard :: Parser Safeguard
 p_safeguard =
-    nullOption
+    option (eitherReader $ either (Left . showReason) Right . parseSafeguard)
         $  long "safeguard"
-        <> reader (either (const $ fail msg) return . parseSafeguard)
         <> metavar "SAFEGUARD"
         <> help "keys used to encrypt the secret key"
-  where
-    msg = "bad safeguard syntax"
 
 p_key_text :: Parser FilePath
 p_key_text =
@@ -430,7 +427,7 @@ p_key_text =
 
 p_file :: String -> String -> Parser FilePath
 p_file mtv hlp =
-    argument Just
+    argument str
         $  metavar mtv
         <> help    hlp
 
@@ -442,7 +439,7 @@ p_armour =
 
 p_opt :: Parser OptEnum
 p_opt =
-    argument (parseOpt . T.pack)
+    argument (eitherReader $ maybe (Left "bad SETTING-OPT") Right . parseOpt . T.pack)
         $  metavar "SETTING-OPT"
         <> help    "name of a keystore setting option"
 
@@ -455,10 +452,10 @@ runParse pinfo args =
     Success a -> return a
     Failure failure -> do
       progn <- getProgName
-      let (msg, exit) = execFailure failure progn
+      let (msg, exit, _) = execFailure failure progn
       case exit of
-        ExitSuccess -> putStrLn msg
-        _           -> hPutStrLn stderr msg
+        ExitSuccess -> putStrLn $ show msg
+        _           -> hPutStrLn stderr $ show msg
       exitWith exit
     CompletionInvoked compl -> do
       progn <- getProgName

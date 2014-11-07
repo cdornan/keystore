@@ -20,6 +20,7 @@ module Data.KeyStore.PasswordManager
     , hashMasterPassword
     , bindMasterPassword
     , setup
+    , login
     , passwordValid
     , passwordValid'
     , isStorePresent
@@ -48,7 +49,7 @@ module Data.KeyStore.PasswordManager
     , collectShell
     -- password manager CLI internals
     , passwordManager'
-    , PMCommand
+    , PMCommand(..)
     , pmCommandParser
     ) where
 

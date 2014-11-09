@@ -102,3 +102,11 @@
 
 0.6.3.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-11-07
 	* export 'login' and 'PMCommand' constructors from PasswordManager
+
+0.7.0.0 Chris Dornan <chrisd@irisconnect.co.uk> 2014-11-08
+	* PM: add getStore (for debugging)
+	* PM: fix a curious regression in in the CLI parser
+	  (possibly triggered by the upgrade of a dependent package)
+	* PM: add delete-all-plus-passwords
+	* PM: add filter-plus-passwords
+	* PM: add --exclude-plus-passwords switch to import

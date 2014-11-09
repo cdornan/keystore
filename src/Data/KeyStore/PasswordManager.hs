@@ -51,6 +51,8 @@ module Data.KeyStore.PasswordManager
     , passwordManager'
     , PMCommand(..)
     , pmCommandParser
+    -- debugging
+    , getStore
     ) where
 
 import           Data.KeyStore.Types.PasswordStoreModel
@@ -276,12 +278,24 @@ isBound pmc p mb = enquire pmc $ \ps -> return $
 
 -- | import the contents of another keystore into the current keystore
 import_ :: PW p => PMConfig p -> FilePath -> Maybe PasswordText -> IO ()
-import_ pmc fp mb = wrap pmc $ \ps -> do
-  pwt   <- maybe (get_pw True pmc) return mb
-  mb_ps <- passwordValid' pmc fp pwt
-  case mb_ps of
-    Nothing  -> error "*** Password Invalid ***\n"
-    Just ps' -> return $ Just $ merge_ps ps ps'
+import_ = import__ False
+
+-- | import the contents of another keystore into the current keystore
+import__ :: PW p => Bool -> PMConfig p -> FilePath -> Maybe PasswordText -> IO ()
+import__ x_pps pmc fp0 mb = wrap pmc $ \ps -> do
+    fp    <- tilde fp0
+    ok    <- doesFileExist fp
+    when (not ok) $ error "*** password store not found ***"
+    pwt   <- maybe (get_pw True pmc) return mb
+    mb_ps <- passwordValid' pmc fp pwt
+    case mb_ps of
+      Nothing  -> error "*** Password Invalid ***\n"
+      Just ps' -> return $ Just $ merge_ps x_pps ps ps'
+  where
+    tilde ('~':t@('/':_)) = do
+      mb_hm <- E.lookupEnv "HOME"
+      return $ (fromMaybe "/" mb_hm) ++ t
+    tilde fp = return fp
 
 -- | loads a password into the store; if this is a session password and the
 -- boolean ss is True then the session will be reset to this password also;
@@ -405,8 +419,9 @@ deletePassword :: PW p => PMConfig p -> p -> IO ()
 deletePassword pmc p = wrap pmc $ \ps -> return $ Just $ L.over ps_map (Map.delete (pwName p)) ps
 
 -- | delete a password from the store
-deletePasswordPlus :: PW p => PMConfig p -> PasswordName -> IO ()
-deletePasswordPlus pmc pnm = wrap pmc $ \ps -> return $ Just $ L.over ps_map (Map.delete (plussify pnm)) ps
+deletePasswordPlus :: PW p => PMConfig p -> Maybe PasswordName -> IO ()
+deletePasswordPlus pmc Nothing    = wrap pmc $ \ps -> return $ Just $ L.over ps_map (Map.filter is_static_pw)   ps
+deletePasswordPlus pmc (Just pnm) = wrap pmc $ \ps -> return $ Just $ L.over ps_map (Map.delete (plussify pnm)) ps
 
 -- | delete a session from the store
 deleteSession :: PW p => PMConfig p -> Maybe p -> SessionName -> IO ()
@@ -785,6 +800,9 @@ wrap' pmc f aek = do
   mb  <- f pws
   maybe (return ()) (save_ps pmc aek) mb
 
+getStore :: PW p => PMConfig p -> IO PasswordStore
+getStore pmc = enquire pmc return
+
 enquire :: PW p => PMConfig p -> (PasswordStore -> IO a) -> IO a
 enquire pmc f = do
   aek <- get_key pmc
@@ -826,8 +844,8 @@ load_ps' PMConfig{..} fp = flip catch hdl $ do
 -- the second passwords store, except the store's creation time, which is
 -- taken from the first store; any sessions are also merged with the
 -- sessions in the second store taking precedence
-merge_ps :: PasswordStore -> PasswordStore -> PasswordStore
-merge_ps ps ps' =
+merge_ps :: Bool -> PasswordStore -> PasswordStore -> PasswordStore
+merge_ps x_pps ps ps0' =
   PasswordStore
     { _ps_comment = _ps_comment ps'
     , _ps_map     =  Map.unionWith f (_ps_map ps) (_ps_map ps')
@@ -835,6 +853,15 @@ merge_ps ps ps' =
     }
   where
     f pw pw' = L.over pw_sessions (flip Map.union $ _pw_sessions pw) pw'
+
+    ps' = case x_pps of
+      True  -> L.over ps_map (Map.filter is_static_pw) ps0'
+      False -> ps0'
+
+is_static_pw :: Password -> Bool
+is_static_pw Password{..} = case T.unpack $ _PasswordName _pw_name of
+      '+':_ -> False
+      _     -> True
 
 random_bytes :: Octets -> (Binary->a) -> IO a
 random_bytes sz f = f . Binary . fst . generateCPRNG (_Octets sz) <$> newCPRNG
@@ -880,14 +907,14 @@ ssn_error msg = error $ "session manager error: " ++ msg
 -- The Command Line Parser
 --
 
--- | run a password manager command abstracy syntax command
+-- | run a password manager command
 passwordManager' :: PW p => PMConfig p -> PMCommand p -> IO ()
 passwordManager' pmc pmcd =
   case pmcd of
     PMCD_version                  -> putStrLn version
     PMCD_setup          nl mb_t   -> setup              pmc nl  mb_t
     PMCD_login        y    mb_t   -> login              pmc y   mb_t
-    PMCD_import         fp mb_t   -> import_            pmc fp  mb_t
+    PMCD_import x_pps   fp mb_t   -> import__     x_pps pmc fp  mb_t
     PMCD_load            p mb_t   -> load               pmc p   mb_t
     PMCD_load_plus     pnm mb_t   -> loadPlus           pmc pnm mb_t
     PMCD_comment            cmt   -> psComment          pmc cmt
@@ -914,24 +941,24 @@ data PMCommand p
     = PMCD_version
     | PMCD_setup  Bool              (Maybe PasswordText)
     | PMCD_login  Bool              (Maybe PasswordText)
-    | PMCD_import          FilePath (Maybe PasswordText)
+    | PMCD_import Bool     FilePath (Maybe PasswordText)
     | PMCD_load        p            (Maybe PasswordText)
     | PMCD_load_plus   PasswordName (Maybe PasswordText)
-    | PMCD_comment       PasswordStoreComment
+    | PMCD_comment     PasswordStoreComment
     | PMCD_prime     Bool p
     | PMCD_prime_all Bool
-    | PMCD_select          (Maybe p) SessionName
-    | PMCD_delete_password        p
-    | PMCD_delete_password_plus PasswordName
-    | PMCD_delete_session  (Maybe p) SessionName
+    | PMCD_select               (Maybe p) SessionName
+    | PMCD_delete_password             p
+    | PMCD_delete_password_plus (Maybe PasswordName)
+    | PMCD_delete_session       (Maybe p) SessionName
     | PMCD_status         Bool
     | PMCD_prompt
     | PMCD_passwords      Bool
     | PMCD_passwords_plus Bool
     | PMCD_session        Bool
-    | PMCD_sessions       Bool (Maybe p)
+    | PMCD_sessions       Bool  (Maybe p)
     | PMCD_info           Bool         p
-    | PMCD_info_plus      Bool         PasswordName
+    | PMCD_info_plus      Bool PasswordName
     | PMCD_dump           Bool
     | PMCD_collect
     | PMCD_sample_script
@@ -952,28 +979,29 @@ command_info pmc =
 pmCommandParser :: PW p => PMConfig p -> Parser (PMCommand p)
 pmCommandParser pmc =
     subparser $ f $ g
-     $  command "version"             pi_version
-     <> command "setup"              (pi_setup            pmc)
-     <> command "login"              (pi_login            pmc)
-     <> command "import"             (pi_import           pmc)
-     <> command "load"               (pi_load             pmc)
-     <> command "comment"             pi_comment
-     <> command "prime"               pi_prime
-     <> command "prime-all"           pi_prime_all
-     <> command "select"              pi_select
-     <> command "delete-password"    (pi_delete_password  pmc)
-     <> command "delete-session"      pi_delete_session
-     <> command "status"              pi_status
-     <> command "prompt"              pi_prompt
-     <> command "passwords"           pi_passwords
-     <> command "passwords-plus"      pi_passwords_plus
-     <> command "session"             pi_session
-     <> command "sessions"            pi_sessions
-     <> command "info"               (pi_info             pmc)
-     <> command "collect"             pi_collect
+     $  command "version"                   pi_version
+     <> command "setup"                     (pi_setup            pmc)
+     <> command "login"                     (pi_login            pmc)
+     <> command "import"                    (pi_import           pmc)
+     <> command "load"                      (pi_load             pmc)
+     <> command "comment"                   pi_comment
+     <> command "prime"                     pi_prime
+     <> command "prime-all"                 pi_prime_all
+     <> command "select"                    pi_select
+     <> command "delete-password"           (pi_delete_password  pmc)
+     <> command "delete-all-plus-passwords" pi_delete_all_plus_passwords
+     <> command "delete-session"            pi_delete_session
+     <> command "status"                    pi_status
+     <> command "prompt"                    pi_prompt
+     <> command "passwords"                 pi_passwords
+     <> command "passwords-plus"            pi_passwords_plus
+     <> command "session"                   pi_session
+     <> command "sessions"                  pi_sessions
+     <> command "info"                      (pi_info             pmc)
+     <> command "collect"                   pi_collect
   where
-    s = command "sample-load-script"  pi_sample_script
-    d = command "dump"                pi_dump
+    s = command "sample-load-script"        pi_sample_script
+    d = command "dump"                      pi_dump
 
     f = case _pmc_sample_script pmc of
           Nothing -> id
@@ -1004,7 +1032,7 @@ pi_login pmc =
 pi_import :: PW p => PMConfig p -> ParserInfo (PMCommand p)
 pi_import pmc =
     h_info
-        (helper <*> (PMCD_import <$> p_store_fp <*> optional (p_password_text True pmc)))
+        (helper <*> (PMCD_import <$> p_x_pps <*> p_store_fp <*> optional (p_password_text True pmc)))
         (progDesc "import the contents of another store")
 
 pi_load :: PW p => PMConfig p -> ParserInfo (PMCommand p)
@@ -1042,6 +1070,12 @@ pi_delete_password pmc =
      h_info
         (helper <*> p_delete_password pmc)
         (progDesc "delete a password from the store")
+
+pi_delete_all_plus_passwords :: ParserInfo (PMCommand p)
+pi_delete_all_plus_passwords =
+     h_info
+        (helper <*> pure (PMCD_delete_password_plus Nothing))
+        (progDesc "delete all dynamic (plus) passwords forom the store")
 
 pi_delete_session :: PW p => ParserInfo (PMCommand p)
 pi_delete_session =
@@ -1113,25 +1147,23 @@ pi_sample_script =
 
 p_load_command, p_delete_password, p_info :: PW p => PMConfig p -> Parser (PMCommand p)
 
-p_load_command pmc =
-  (PMCD_load_plus <$> p_pl_pw pmc <*> optional (p_password_text False pmc) <|>
-   PMCD_load      <$> p_pw_id     <*> optional (p_password_text False pmc)      ) <* optional p_load_comment
-
-p_delete_password pmc =
-  PMCD_delete_password_plus <$> p_pl_pw pmc                     <|>
-  PMCD_delete_password      <$> p_pw_id
-
-p_info pmc = f <$> p_secret_sw <*> ((Left <$> p_pl_pw pmc) <|> (Right <$> p_pw_id))
+p_load_command pmc = f <$> p_pw pmc <*> optional (p_password_text False pmc) <* optional p_load_comment
   where
-    f s_sw (Left  pnm) = PMCD_info_plus s_sw pnm
-    f s_sw (Right p  ) = PMCD_info      s_sw p
+    f ei op_p = either (flip PMCD_load op_p) (flip PMCD_load_plus op_p) ei
+
+p_delete_password pmc = either PMCD_delete_password (PMCD_delete_password_plus . Just) <$> p_pw pmc
+
+p_info pmc = f <$> p_secret_sw <*> p_pw pmc
+  where
+    f s_sw (Left  p  ) = PMCD_info      s_sw p
+    f s_sw (Right pnm) = PMCD_info_plus s_sw pnm
 
 -- switches
 
 p_brief_sw :: Parser Bool
 p_brief_sw =
     switch
-        (short  'b'            <>
+        (short   'b'            <>
          long    "brief"        <>
          help    "list the identifiers only")
 
@@ -1156,6 +1188,13 @@ p_quiet_sw =
          long    "quiet"        <>
          help    "don't print anything but report with error codes (0=>logged in)")
 
+p_secret_sw :: Parser Bool
+p_secret_sw =
+    switch
+        (short  's'            <>
+         long    "secret"      <>
+         help    "show the secret password")
+
 p_sessions_sw :: Parser Bool
 p_sessions_sw =
     switch
@@ -1168,6 +1207,13 @@ p_unprime_sw =
         (short  'u'            <>
          long    "unprime"     <>
          help    "clear the prime status")
+
+p_x_pps :: Parser Bool
+p_x_pps =
+    switch
+        (short   'x'                          <>
+         long    "exclude-plus-passwords"     <>
+         help    "exclude the dynamic (plus) passwords")
 
 -- options
 
@@ -1199,27 +1245,24 @@ p_password_text hp pmc =
         $  metavar "PASSWORD-TEXT"
         <> help    "the text of the password"
 
+p_pw :: PW p => PMConfig p -> Parser (Either p PasswordName)
+p_pw pmc =
+    argument (eitherReader $ maybe (Left "bad password syntax") Right . prs)
+      $  metavar "PASSWORD"
+      <> help    "a static or dynamic (+) password name"
+  where
+    prs s =
+      Left  <$> (parsePwName $ PasswordName $ T.pack s)    <|>
+      Right <$> (parse_plus_pw pmc s)
+
 p_pw_id :: PW p => Parser p
 p_pw_id =
     argument (eitherReader $ maybe (fail "bad password syntax") return . parsePwName . PasswordName . T.pack)
         $  metavar "PASSWORD-ID"
         <> help    "a password ID"
 
-p_pl_pw :: PW p => PMConfig p -> Parser PasswordName
-p_pl_pw pmc =
-    argument (eitherReader $ maybe (fail "bad +password syntax") return . parse_plus_pw pmc)
-        $  metavar "+PASSWORD"
-        <> help    "a dynamic (plus) password name"
-
 p_ps_comment :: Parser PasswordStoreComment
 p_ps_comment = PasswordStoreComment . T.pack <$> p_comment
-
-p_secret_sw :: Parser Bool
-p_secret_sw =
-    switch
-        (short  's'            <>
-         long    "secret"      <>
-         help    "show the secret password")
 
 p_session_name :: Parser SessionName
 p_session_name =

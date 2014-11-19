@@ -80,19 +80,19 @@ class (Code h, Code s, Code k) => Sections h s k
     , s -> k, h -> k
     where
   hostDeploySection   :: h -> s                           -- ^ the deployment section: for a given host,
-                                                        -- the starting section for locating the keys
-                                                        -- during a deployment ('higher'/closer sections
-                                                        -- taking priority)
+                                                          -- the starting section for locating the keys
+                                                          -- during a deployment ('higher'/closer sections
+                                                          -- taking priority)
   sectionType         :: s -> SectionType                 -- ^ whether the section holds the top key for the
-                                                        -- keystore (i.e., keystore master key), the signing key
-                                                        -- for the keystore or is a normal section containing
-                                                        -- deployment keys
+                                                          -- keystore (i.e., keystore master key), the signing key
+                                                          -- for the keystore or is a normal section containing
+                                                          -- deployment keys
   superSections       :: s -> [s]                         -- ^ the sections that get a copy of the master
-                                                        -- for this section (making all of its keys
-                                                        -- available to them); N.B., the graph formed by this
-                                                        -- this relationship over the sections must be acyclic
+                                                          -- for this section (making all of its keys
+                                                          -- available to them); N.B., the graph formed by this
+                                                          -- this relationship over the sections must be acyclic
   keyIsHostIndexed    :: k -> Maybe (h->Bool)             -- ^ if the key is host-indexed then the predicate
-                                                        -- specifies the hosts that use this key
+                                                          -- specifies the hosts that use this key
   keyIsInSection      :: k -> s -> Bool                   -- ^ specifies which sections a key is resident in
   getKeyData          :: Maybe h -> s -> k -> IO KeyData  -- ^ loads the data for a particular key
   getKeyDataWithMode  :: Maybe h -> s -> k -> IO (KeyDataMode,KeyData)
@@ -101,7 +101,7 @@ class (Code h, Code s, Code k) => Sections h s k
   describeKey         :: k -> String                      -- ^ describes the key (for the ks help command)
   describeSection     :: s -> String                      -- ^ describes the section (for the ks help command)
   sectionPWEnvVar     :: s -> EnvVar                      -- ^ secifies the environment variable containing the
-                                                        -- ^ master password/provate key for for the given section
+                                                          -- ^ master password/provate key for for the given section
 
   sectionType                   = const ST_keys
 

@@ -32,6 +32,7 @@ module Data.KeyStore.Sections
   , keyName
   , keyName_
   , passwordName
+  , mkSection
   )
   where
 
@@ -183,7 +184,7 @@ initialise cp kp = do
     scs = const sectionSettings
 
     mks :: Sections h s k => KeyPredicate h s k -> IC -> s -> IO ()
-    mks = const mk_section
+    mks = const mkSection
 
 -- | Rotate in a set of keys specified by the predicate.
 rotate :: Sections h s k => IC -> KeyPredicate h s k -> IO ()
@@ -405,16 +406,16 @@ lower_sections s0 =
   s0 : concat
     [ s:lower_sections s | s<-[minBound..maxBound], s0 `elem` superSections s ]
 
-mk_section :: Sections h s k => IC -> s -> IO ()
-mk_section ic s = do
-  mk_section' ic s
+mkSection :: Sections h s k => IC -> s -> IO ()
+mkSection ic s = do
+  mk_section ic s
   case sectionType s of
     ST_top     -> return ()
     ST_signing -> add_signing ic s
     ST_keys    -> return ()
 
-mk_section' :: Sections h s k => IC -> s -> IO ()
-mk_section' ic s =
+mk_section :: Sections h s k => IC -> s -> IO ()
+mk_section ic s =
  do add_password ic s
     add_save_key ic s
     add_trigger  ic s

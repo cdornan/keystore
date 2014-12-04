@@ -110,3 +110,6 @@
 	* PM: add delete-all-plus-passwords
 	* PM: add filter-plus-passwords
 	* PM: add --exclude-plus-passwords switch to import
+
+0.7.0.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-12-04
+	* Data.KeyStore.Sections: export mkSection

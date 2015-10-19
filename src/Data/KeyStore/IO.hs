@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE DeriveDataTypeable         #-}
@@ -87,8 +88,11 @@ import qualified Control.Exception              as X
 import qualified Control.Lens                   as L
 import           Control.Monad
 import           System.IO
-import           System.Locale
 
+#if MIN_VERSION_time(1,5,0)
+#else
+import           System.Locale (defaultTimeLocale)
+#endif
 
 -- | Generate a new keystore located in the given file with the given global
 -- settings.

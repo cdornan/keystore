@@ -1,0 +1,16 @@
+resolver: lts-3.7
+system-ghc: false
+install-ghc: true
+packages:
+  - '.'
+  - location:
+      git: https://github.com/iconnect/api-tools
+      commit: e1f610fd32a8c3c2299ccf6c3b19c3106e3f22d2
+  - location:
+      git: https://github.com/well-typed/binary-serialise-cbor
+      commit: 9a74b489d0015fb7b4f2b46398f316de9bc92952
+extra-deps:
+  - api-tools-0.6
+  - binary-serialize-cbor-0.1.1.0
+  - pbkdf-1.1.1.1
+  - regex-compat-tdfa-0.95.1.4

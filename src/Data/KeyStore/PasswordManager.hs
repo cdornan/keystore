@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
@@ -82,10 +83,13 @@ import qualified System.Environment                       as E
 import           System.SetEnv
 import           System.Exit
 import           System.IO
-import           System.Locale
 import qualified Options.Applicative                      as O
 import           Options.Applicative
 
+#if MIN_VERSION_time(1,5,0)
+#else
+import           System.Locale (defaultTimeLocale)
+#endif
 
 -- | The password manager is used for storing locally the passwords and session
 -- tokens of a single user.  The password used to encode the store is stored in

@@ -45,3 +45,4 @@ test-atlas
 benchmarks/csv
 benchmarks/chart.png
 test-state
+.stack-work

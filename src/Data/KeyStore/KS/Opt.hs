@@ -41,7 +41,6 @@ import           Data.Monoid
 import           Data.Maybe
 import           Data.Char
 import           Text.Printf
-import           Control.Applicative
 
 
 data Opt a

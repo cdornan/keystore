@@ -55,7 +55,6 @@ import qualified Data.ASN1.BinaryEncoding       as A
 import qualified Data.ASN1.Types                as A
 import qualified Data.ByteString.Lazy.Char8     as LBS
 import qualified Data.ByteString.Char8          as B
-import           Control.Applicative
 import           Crypto.PubKey.RSA
 import qualified Crypto.PubKey.RSA.OAEP         as OAEP
 import qualified Crypto.PubKey.RSA.PSS          as PSS

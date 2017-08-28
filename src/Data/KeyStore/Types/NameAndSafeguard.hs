@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving         #-}
 
 module Data.KeyStore.Types.NameAndSafeguard
     ( Name
@@ -13,14 +14,15 @@ module Data.KeyStore.Types.NameAndSafeguard
     ) where
 
 import           Data.KeyStore.Types.E
+import           Data.Char
 import qualified Data.Set                       as Set
 import           Data.String
-import           Data.Char
 import qualified Control.Exception              as X
 
 newtype Name
     = Name            { _Name            :: String       }
     deriving (Eq,Ord,IsString,Read,Show)
+
 
 name :: String -> E Name
 name s =
@@ -41,7 +43,6 @@ instance IsString Safeguard where
         case parseSafeguard s of
           Left err -> X.throw err
           Right sg -> sg
-
 
 safeguard :: [Name] -> Safeguard
 safeguard = Safeguard . Set.fromList
@@ -85,4 +86,3 @@ is_nm_char c = isAscii c || isDigit c || c `Set.member` sg_sym_chs
 
 sg_sym_chs :: Set.Set Char
 sg_sym_chs = Set.fromList ".-_:'=#$%"
-

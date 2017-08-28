@@ -346,7 +346,7 @@ load pmc p mb = wrap pmc $ \ps -> do
             { _ssn_name      = _sd_name
             , _ssn_password  = pwt
             , _ssn_isOneShot = ios
-            , _ssn_setup     = now
+            , _ssn_setup     = UTC now
             }
 
         ios         = _sd_isOneShot
@@ -579,7 +579,7 @@ sessions pmc a b mb = do
         pn_s = T.unpack $ _PasswordName _pw_name
         sn_s = T.unpack $ _SessionName  _ssn_name
         p_c  = if _ssn_isOneShot then prime_char False else ' '
-        su_s = pretty_setup tz _ssn_setup
+        su_s = pretty_setup tz $ _UTC _ssn_setup
         a_s  = if active_session trp then "[ACTIVE]" else "" :: String
 
     sgl = length [ () | p<-[minBound..maxBound], isJust $ isSession $ cast_pmc pmc p ] == 1

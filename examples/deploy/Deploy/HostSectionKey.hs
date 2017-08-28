@@ -14,7 +14,6 @@ import qualified Data.Text                      as T
 import qualified Data.ByteString.Char8          as B
 import qualified Data.ByteString.Lazy.Char8     as LBS
 import qualified Text.RawString.QQ              as RS
-import           Control.Monad.RWS.Strict
 import           Text.Printf
 
 

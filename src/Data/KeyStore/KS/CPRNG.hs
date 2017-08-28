@@ -9,7 +9,6 @@ module Data.KeyStore.KS.CPRNG
     ) where
 
 import           Crypto.Random
-import           Control.Applicative
 import qualified Data.ByteString                as B
 
 

@@ -48,7 +48,6 @@ import           Data.Maybe
 import           Data.List
 import           Data.Time
 import           Text.Printf
-import           Control.Applicative
 import qualified Control.Lens                   as L
 import           Control.Monad
 

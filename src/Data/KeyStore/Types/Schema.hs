@@ -29,21 +29,68 @@ import           Data.API.Changes
 keystoreSchema    :: API
 keystoreChangelog :: APIChangelog
 (keystoreSchema, keystoreChangelog) = [apiWithChangelog|
-ks :: KeyStore
+
+//
+// External Representation Only
+//
+
+// The builtin support for map-like types introduced in Aeson 1.0 has broken
+// the mechanism for representing Map in this schema. In order to minimise the
+// disruption and preserve the existing schema representation we have renamed
+// all of the types in the schema that contain Map types. In the model these
+// types are reconstructed just as they would have been in previous KeyStore
+// editions and mapping functions have been introduced to convert between the
+// two representations. The KeyStore gets read with this representation,
+// matching the representation of past keystore packages and gets converted
+//  into the internal type representation (with the maps) that the rest of the
+// keystore code base expects.
+
+z_ks :: KeyStore_
     // the keystore
     = record
-        config :: Configuration
-        keymap :: KeyMap
+        config :: Configuration_
+        keymap :: KeyMap_
 
-cfg :: Configuration
+z_cfg :: Configuration_
     = record
         settings :: Settings
-        triggers :: TriggerMap
+        triggers :: TriggerMap_
 
-tmp :: TriggerMap
+z_tmp :: TriggerMap_
     = record
         map :: [Trigger]
-    with inj_trigger_map, prj_trigger_map
+
+z_kmp :: KeyMap_
+    = record
+        map :: [NameKeyAssoc_]
+
+z_nka :: NameKeyAssoc_
+    = record
+        name :: Name
+        key  :: Key_
+
+z_key :: Key_
+    = record
+        name          :: Name
+        comment       :: Comment
+        identity      :: Identity
+        is_binary     :: boolean
+        env_var       :: ? EnvVar
+        hash          :: ? Hash
+        public        :: ? PublicKey
+        secret_copies :: EncrypedCopyMap_
+        clear_text    :: ? ClearText
+        clear_private :: ? PrivateKey
+        created_at    :: UTC
+
+z_ecm :: EncrypedCopyMap_
+    = record
+        map :: [EncrypedCopy]
+
+
+//
+// Classic Schema Definitions
+//
 
 trg :: Trigger
     = record
@@ -55,35 +102,6 @@ stgs :: Settings
     = record
         'json'   :: json
     with inj_settings, prj_settings
-
-tja :: TextJsonAssoc
-    = record
-        id  :: SettingID
-        key :: json
-
-kmp :: KeyMap
-    = record
-        map :: [NameKeyAssoc]
-    with inj_keymap, prj_keymap
-
-nka :: NameKeyAssoc
-    = record
-        name :: Name
-        key  :: Key
-
-key :: Key
-    = record
-        name          :: Name
-        comment       :: Comment
-        identity      :: Identity
-        is_binary     :: boolean
-        env_var       :: ? EnvVar
-        hash          :: ? Hash
-        public        :: ? PublicKey
-        secret_copies :: EncrypedCopyMap
-        clear_text    :: ? ClearText
-        clear_private :: ? PrivateKey
-        created_at    :: utc
 
 hash :: Hash
     = record
@@ -98,11 +116,6 @@ hashd :: HashDescription
           width_octets :: Octets
           salt_octets  :: Octets
           salt         :: Salt
-
-ecm :: EncrypedCopyMap
-    = record
-        map :: [EncrypedCopy]
-    with inj_encrypted_copy_map, prj_encrypted_copy_map
 
 ec :: EncrypedCopy
     = record

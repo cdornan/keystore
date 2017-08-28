@@ -30,29 +30,32 @@ module Data.KeyStore.Types
     ( module Data.KeyStore.Types
     , module Data.KeyStore.Types.NameAndSafeguard
     , module Data.KeyStore.Types.E
+    , module Data.KeyStore.Types.UTC
     , PublicKey(..)
     , PrivateKey(..)
     ) where
 
+import qualified Control.Lens                   as L
+import qualified Crypto.PBKDF.ByteString        as P
+import           Crypto.PubKey.RSA (PublicKey(..), PrivateKey(..))
 import           Data.KeyStore.Types.Schema
 import           Data.KeyStore.Types.NameAndSafeguard
 import           Data.KeyStore.Types.E
+import           Data.KeyStore.Types.UTC
 import           Data.Aeson
-import qualified Data.Map                       as Map
-import           Data.Monoid
-import qualified Data.Text                      as T
-import           Data.List
-import           Data.Ord
-import           Data.String
 import           Data.API.Tools
-import           Data.API.Types
 import           Data.API.JSON
+import           Data.API.Types
 import qualified Data.ByteString                as B
 import qualified Data.HashMap.Strict            as HM
+import           Data.List
+import qualified Data.Map                       as Map
+import           Data.Ord
+import qualified Data.Text                      as T
+import           Data.Time
+import           Data.String
 import qualified Data.Vector                    as V
 import           Text.Regex
-import qualified Crypto.PBKDF.ByteString        as P
-import           Crypto.PubKey.RSA (PublicKey(..), PrivateKey(..))
 
 
 $(generate                         keystoreSchema)
@@ -101,15 +104,6 @@ prj_pattern :: Pattern -> REP__Pattern
 prj_pattern = REP__Pattern . T.pack . _pat_string
 
 
-type TriggerMap = Map.Map TriggerID Trigger
-
-inj_trigger_map :: REP__TriggerMap -> ParserWithErrs TriggerMap
-inj_trigger_map = map_from_list "TriggerMap" _tmp_map _trg_id _TriggerID
-
-prj_trigger_map :: TriggerMap -> REP__TriggerMap
-prj_trigger_map = REP__TriggerMap . Map.elems
-
-
 newtype Settings = Settings { _Settings :: Object }
     deriving (Eq,Show)
 
@@ -144,43 +138,6 @@ marker :: Value
 marker = String "*** Collision * in * Settings ***"
 
 
-type KeyMap = Map.Map Name Key
-
-inj_keymap :: REP__KeyMap -> ParserWithErrs KeyMap
-inj_keymap (REP__KeyMap as) =
-        return $ Map.fromList [ (_nka_name,_nka_key) | NameKeyAssoc{..}<-as ]
-
-prj_keymap :: KeyMap -> REP__KeyMap
-prj_keymap mp = REP__KeyMap [ NameKeyAssoc nme key | (nme,key)<-Map.toList mp ]
-
-emptyKeyStore :: Configuration -> KeyStore
-emptyKeyStore cfg =
-    KeyStore
-        { _ks_config = cfg
-        , _ks_keymap = emptyKeyMap
-        }
-
-emptyKeyMap :: KeyMap
-emptyKeyMap = Map.empty
-
-
-type EncrypedCopyMap = Map.Map Safeguard EncrypedCopy
-
-inj_encrypted_copy_map :: REP__EncrypedCopyMap -> ParserWithErrs EncrypedCopyMap
-inj_encrypted_copy_map (REP__EncrypedCopyMap ecs) =
-        return $ Map.fromList [ (_ec_safeguard ec,ec) | ec<-ecs ]
-
-prj_encrypted_copy_map :: EncrypedCopyMap -> REP__EncrypedCopyMap
-prj_encrypted_copy_map mp = REP__EncrypedCopyMap [ ec | (_,ec)<-Map.toList mp ]
-
-defaultConfiguration :: Settings -> Configuration
-defaultConfiguration stgs =
-  Configuration
-    { _cfg_settings = stgs
-    , _cfg_triggers = Map.empty
-    }
-
-
 inj_safeguard :: REP__Safeguard -> ParserWithErrs Safeguard
 inj_safeguard = return . safeguard . _sg_names
 
@@ -212,8 +169,6 @@ prj_PublicKey PublicKey{..} =
         , _puk_n    = public_n
         , _puk_e    = public_e
         }
-
-
 
 
 inj_PrivateKey :: REP__PrivateKey -> ParserWithErrs PrivateKey
@@ -297,6 +252,170 @@ map_from_list ty xl xf xt c =
 
 $(generateAPITools keystoreSchema
                    [ enumTool
-                   , jsonTool
+                   , jsonTool'
                    , lensTool
                    ])
+
+
+instance ToJSON KeyStore where
+  toJSON = toJSON . toKeyStore_
+
+instance FromJSON KeyStore where
+  parseJSON = fmap fromKeyStore_ . parseJSON
+
+instance FromJSONWithErrs KeyStore where
+  parseJSONWithErrs = fmap fromKeyStore_ . parseJSONWithErrs
+
+
+data KeyStore =
+  KeyStore
+    { _ks_config :: Configuration
+    , _ks_keymap :: KeyMap
+    }
+  deriving (Show,Eq)
+
+toKeyStore_ :: KeyStore -> KeyStore_
+toKeyStore_ KeyStore{..} =
+  KeyStore_
+    { _z_ks_config = toConfiguration_ _ks_config
+    , _z_ks_keymap = toKeyMap_        _ks_keymap
+    }
+
+fromKeyStore_ :: KeyStore_ -> KeyStore
+fromKeyStore_ KeyStore_{..} =
+  KeyStore
+    { _ks_config = fromConfiguration_ _z_ks_config
+    , _ks_keymap = fromKeyMap_        _z_ks_keymap
+    }
+
+emptyKeyStore :: Configuration -> KeyStore
+emptyKeyStore cfg =
+  KeyStore
+      { _ks_config = cfg
+      , _ks_keymap = emptyKeyMap
+      }
+
+
+data Configuration =
+  Configuration
+    { _cfg_settings :: Settings
+    , _cfg_triggers :: TriggerMap
+    }
+  deriving (Show,Eq)
+
+toConfiguration_ :: Configuration -> Configuration_
+toConfiguration_ Configuration{..} =
+  Configuration_
+    { _z_cfg_settings =               _cfg_settings
+    , _z_cfg_triggers = toTriggerMap_ _cfg_triggers
+    }
+
+fromConfiguration_ :: Configuration_ -> Configuration
+fromConfiguration_ Configuration_{..} =
+  Configuration
+    { _cfg_settings =                 _z_cfg_settings
+    , _cfg_triggers = fromTriggerMap_ _z_cfg_triggers
+    }
+
+defaultConfiguration :: Settings -> Configuration
+defaultConfiguration stgs =
+  Configuration
+    { _cfg_settings = stgs
+    , _cfg_triggers = Map.empty
+    }
+
+
+type TriggerMap = Map.Map TriggerID Trigger
+
+toTriggerMap_ :: TriggerMap -> TriggerMap_
+toTriggerMap_ mp = TriggerMap_ $ Map.elems mp
+
+fromTriggerMap_ :: TriggerMap_ -> TriggerMap
+fromTriggerMap_ TriggerMap_{..} = Map.fromList
+  [ (,) _trg_id trg
+    | trg@Trigger{..} <- _z_tmp_map
+    ]
+
+
+type KeyMap = Map.Map Name Key
+
+toKeyMap_ :: KeyMap -> KeyMap_
+toKeyMap_ mp = KeyMap_ $
+  [ NameKeyAssoc_ nm $ toKey_ ky
+    | (nm,ky) <- Map.assocs mp
+    ]
+
+fromKeyMap_ :: KeyMap_ -> KeyMap
+fromKeyMap_ mp_ = Map.fromList
+  [ (_z_nka_name,fromKey_ _z_nka_key)
+    | NameKeyAssoc_{..} <- _z_kmp_map mp_
+    ]
+
+emptyKeyMap :: KeyMap
+emptyKeyMap = Map.empty
+
+
+data Key =
+  Key
+    { _key_name          :: Name
+    , _key_comment       :: Comment
+    , _key_identity      :: Identity
+    , _key_is_binary     :: Bool
+    , _key_env_var       :: Maybe EnvVar
+    , _key_hash          :: Maybe Hash
+    , _key_public        :: Maybe PublicKey
+    , _key_secret_copies :: EncrypedCopyMap
+    , _key_clear_text    :: Maybe ClearText
+    , _key_clear_private :: Maybe PrivateKey
+    , _key_created_at    :: UTCTime
+    }
+  deriving (Show,Eq)
+
+toKey_ :: Key -> Key_
+toKey_ Key{..} =
+  Key_
+    { _z_key_name          =                   _key_name
+    , _z_key_comment       =                   _key_comment
+    , _z_key_identity      =                   _key_identity
+    , _z_key_is_binary     =                   _key_is_binary
+    , _z_key_env_var       =                   _key_env_var
+    , _z_key_hash          =                   _key_hash
+    , _z_key_public        =                   _key_public
+    , _z_key_secret_copies = toEncrypedCopyMap _key_secret_copies
+    , _z_key_clear_text    =                   _key_clear_text
+    , _z_key_clear_private =                   _key_clear_private
+    , _z_key_created_at    = UTC               _key_created_at
+    }
+
+fromKey_ :: Key_ -> Key
+fromKey_ Key_{..} =
+  Key
+    { _key_name          =                     _z_key_name
+    , _key_comment       =                     _z_key_comment
+    , _key_identity      =                     _z_key_identity
+    , _key_is_binary     =                     _z_key_is_binary
+    , _key_env_var       =                     _z_key_env_var
+    , _key_hash          =                     _z_key_hash
+    , _key_public        =                     _z_key_public
+    , _key_secret_copies = fromEncrypedCopyMap _z_key_secret_copies
+    , _key_clear_text    =                     _z_key_clear_text
+    , _key_clear_private =                     _z_key_clear_private
+    , _key_created_at    = _UTC                _z_key_created_at
+    }
+
+
+type EncrypedCopyMap = Map.Map Safeguard EncrypedCopy
+
+toEncrypedCopyMap :: EncrypedCopyMap -> EncrypedCopyMap_
+toEncrypedCopyMap mp = EncrypedCopyMap_ $ Map.elems mp
+
+fromEncrypedCopyMap :: EncrypedCopyMap_ -> EncrypedCopyMap
+fromEncrypedCopyMap EncrypedCopyMap_{..} = Map.fromList
+  [ (,) _ec_safeguard ec
+    | ec@EncrypedCopy{..} <- _z_ecm_map
+    ]
+
+
+L.makeLenses ''KeyStore
+L.makeLenses ''Configuration
+L.makeLenses ''Key

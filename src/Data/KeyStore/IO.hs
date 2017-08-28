@@ -83,7 +83,6 @@ import qualified Data.ByteString.Base64         as B64
 import qualified Data.Map                       as Map
 import           Data.Time
 import           Text.Printf
-import           Control.Applicative
 import qualified Control.Exception              as X
 import qualified Control.Lens                   as L
 import           Control.Monad
@@ -395,7 +394,7 @@ putCtxState :: IC -> Ctx -> State -> IO ()
 putCtxState IC{..} ctx st =
  do maybe (return ()) (flip writeIORef (ctx,st)) ic_cache
     when (not $ maybe False id $ cp_readonly ic_ctx_params) $
-        LBS.writeFile (ctx_store ctx) $ keyStoreBytes $ st_keystore st
+      LBS.writeFile (ctx_store ctx) $ keyStoreBytes $ st_keystore st
 
 report :: String -> IO ()
 report = hPutStrLn stderr

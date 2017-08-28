@@ -44,7 +44,6 @@ import qualified Data.Map                       as Map
 import qualified Data.ByteString                as B
 import           Data.Typeable
 import           Data.Time
-import           Control.Applicative
 import           Control.Monad.RWS.Strict
 import qualified Control.Monad.Error            as E
 import           Control.Exception

@@ -21,7 +21,6 @@ import           Data.Word
 import           Data.Bits
 import           Data.Char
 import           Text.Printf
-import           Control.Applicative
 import           Control.Monad.RWS.Strict
 import qualified Control.Monad.Error            as E
 

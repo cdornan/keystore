@@ -12,7 +12,6 @@ import qualified Data.ByteString.Lazy.Char8     as LBS
 import qualified Data.Text                    as T
 import qualified Data.Aeson                   as A
 import qualified Data.HashMap.Strict          as HM
-import           Control.Applicative
 
 
 deploy :: IC -> HostID -> IO LBS.ByteString

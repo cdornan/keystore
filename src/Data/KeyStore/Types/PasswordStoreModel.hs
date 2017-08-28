@@ -18,13 +18,57 @@
 
 module Data.KeyStore.Types.PasswordStoreModel where
 
+import qualified Control.Lens               as L
+import           Data.Aeson
+import           Data.API.JSON
 import           Data.KeyStore.Types.PasswordStoreSchema
 import qualified Data.Map                                 as Map
 import           Data.API.Tools
-import           Data.API.JSON
+import           Data.Time
+import           Data.KeyStore.Types.UTC
 
 
 $(generate passwordStoreSchema)
+$(generateAPITools passwordStoreSchema
+                   [ enumTool
+                   , jsonTool'
+                   , lensTool
+                   ])
+
+
+instance ToJSON PasswordStore where
+  toJSON = toJSON . toPasswordStore_
+
+instance FromJSON PasswordStore where
+  parseJSON = fmap fromPasswordStore_ . parseJSON
+
+instance FromJSONWithErrs PasswordStore where
+  parseJSONWithErrs = fmap fromPasswordStore_ . parseJSONWithErrs
+
+
+data PasswordStore =
+  PasswordStore
+    { _ps_comment :: PasswordStoreComment
+    , _ps_map     :: PasswordMap
+    , _ps_setup   :: UTCTime
+    }
+  deriving (Show,Eq)
+
+toPasswordStore_ :: PasswordStore -> PasswordStore_
+toPasswordStore_ PasswordStore{..} =
+  PasswordStore_
+    { _z_ps_comment =                _ps_comment
+    , _z_ps_map     = toPasswordMap_ _ps_map
+    , _z_ps_setup   = UTC            _ps_setup
+    }
+
+fromPasswordStore_ :: PasswordStore_ -> PasswordStore
+fromPasswordStore_ PasswordStore_{..} =
+  PasswordStore
+    { _ps_comment =                  _z_ps_comment
+    , _ps_map     = fromPasswordMap_ _z_ps_map
+    , _ps_setup   = _UTC             _z_ps_setup
+    }
 
 
 -- The PasswordStre and SessionMap association lists are represented internally
@@ -33,26 +77,67 @@ $(generate passwordStoreSchema)
 
 type PasswordMap = Map.Map PasswordName Password
 
-inj_pwmap :: REP__PasswordMap -> ParserWithErrs PasswordMap
-inj_pwmap (REP__PasswordMap as) =
-  return $ Map.fromList [ (_npa_name,_npa_password) | NamePasswordAssoc{..}<-as ]
+toPasswordMap_ :: PasswordMap -> PasswordMap_
+toPasswordMap_ mp = PasswordMap_ $
+  [ NamePasswordAssoc_ nm $ toPassword_ pw
+    | (nm,pw) <- Map.assocs mp
+    ]
 
-prj_pwmap :: PasswordMap -> REP__PasswordMap
-prj_pwmap mp = REP__PasswordMap [ NamePasswordAssoc nme pwd | (nme,pwd)<-Map.toList mp ]
+fromPasswordMap_ :: PasswordMap_ -> PasswordMap
+fromPasswordMap_ mp_ = Map.fromList
+  [ (_z_npa_name,fromPassword_ _z_npa_password)
+    | NamePasswordAssoc_{..} <- _z_pm_map mp_
+    ]
+
+
+data Password =
+  Password
+    { _pw_name        :: PasswordName
+    , _pw_text        :: PasswordText
+    , _pw_sessions    :: SessionMap
+    , _pw_isOneShot   :: Bool
+    , _pw_primed      :: Bool
+    , _pw_setup       :: UTCTime
+    }
+  deriving (Show,Eq)
+
+toPassword_ :: Password -> Password_
+toPassword_ Password{..} =
+  Password_
+    { _z_pw_name        =               _pw_name
+    , _z_pw_text        =               _pw_text
+    , _z_pw_sessions    = toSessionMap_ _pw_sessions
+    , _z_pw_isOneShot   =               _pw_isOneShot
+    , _z_pw_primed      =               _pw_primed
+    , _z_pw_setup       = UTC           _pw_setup
+    }
+
+fromPassword_ :: Password_ -> Password
+fromPassword_ Password_{..} =
+  Password
+    { _pw_name        =                 _z_pw_name
+    , _pw_text        =                 _z_pw_text
+    , _pw_sessions    = fromSessionMap_ _z_pw_sessions
+    , _pw_isOneShot   =                 _z_pw_isOneShot
+    , _pw_primed      =                 _z_pw_primed
+    , _pw_setup       = _UTC            _z_pw_setup
+    }
 
 
 type SessionMap = Map.Map SessionName Session
 
-inj_snmap :: REP__SessionMap -> ParserWithErrs SessionMap
-inj_snmap (REP__SessionMap as) =
-  return $ Map.fromList [ (_spa_name,_spa_session) | SessionPasswordAssoc{..}<-as ]
+toSessionMap_ :: SessionMap -> SessionMap_
+toSessionMap_ mp = SessionMap_ $
+  [ SessionPasswordAssoc_ nm ssn
+    | (nm,ssn) <- Map.assocs mp
+    ]
 
-prj_snmap :: SessionMap -> REP__SessionMap
-prj_snmap mp = REP__SessionMap [ SessionPasswordAssoc snm ssn | (snm,ssn)<-Map.toList mp ]
+fromSessionMap_ :: SessionMap_ -> SessionMap
+fromSessionMap_ mp_ = Map.fromList
+  [ (_z_spa_name,_z_spa_session)
+    | SessionPasswordAssoc_{..} <- _z_smp_map mp_
+    ]
 
 
-$(generateAPITools passwordStoreSchema
-                   [ enumTool
-                   , jsonTool
-                   , lensTool
-                   ])
+L.makeLenses ''PasswordStore
+L.makeLenses ''Password

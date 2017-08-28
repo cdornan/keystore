@@ -31,7 +31,6 @@ import           Data.Maybe
 import           Data.Time
 import           Data.IORef
 import qualified Control.Exception              as X
-import           Control.Applicative
 import           System.Environment
 import           System.Directory
 import           System.FilePath

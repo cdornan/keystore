@@ -1,6 +1,7 @@
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports#-}
 
 module Data.KeyStore.KS.Opt
     ( Opt

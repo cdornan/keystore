@@ -2,6 +2,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports#-}
 
 module Data.KeyStore.PasswordManager
     ( PMConfig(..)

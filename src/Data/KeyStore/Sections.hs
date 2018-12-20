@@ -3,6 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses      #-}
 {-# LANGUAGE FunctionalDependencies     #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# OPTIONS_GHC -fno-warn-unused-imports#-}
 
 module Data.KeyStore.Sections
   ( SECTIONS(..)

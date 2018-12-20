@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE QuasiQuotes                #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -17,7 +18,7 @@
 {-# LANGUAGE FlexibleInstances          #-}
 {-# OPTIONS_GHC -fno-warn-orphans       #-}
 {-# OPTIONS_GHC -fno-warn-unused-binds  #-}
-
+{-# OPTIONS_GHC -fno-warn-unused-imports#-}
 
 
 -- | The KeyStore and Associated Types
@@ -119,16 +120,23 @@ defaultSettings :: Settings
 defaultSettings = mempty
 
 
-instance Monoid Settings where
-  mempty = Settings HM.empty
+#if __GLASGOW_HASKELL__ >= 804
+instance Semigroup Settings where
+  (<>) = mappendSettings
+#endif
 
-  mappend (Settings fm_0) (Settings fm_1) =
-              Settings $ HM.unionWith cmb fm_0 fm_1
-    where
-      cmb v0 v1 =
-        case (v0,v1) of
-          (Array v_0,Array v_1) -> Array $ v_0 V.++ v_1
-          _                   -> marker
+instance Monoid Settings where
+  mempty  = Settings HM.empty
+  mappend = mappendSettings
+
+mappendSettings :: Settings -> Settings -> Settings
+mappendSettings (Settings fm_0) (Settings fm_1) =
+    Settings $ HM.unionWith cmb fm_0 fm_1
+  where
+    cmb v0 v1 =
+      case (v0,v1) of
+        (Array v_0,Array v_1) -> Array $ v_0 V.++ v_1
+        _                   -> marker
 
 checkSettingsCollisions :: Settings -> [SettingID]
 checkSettingsCollisions (Settings hm) =

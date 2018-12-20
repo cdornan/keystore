@@ -1,13 +1,12 @@
-resolver: lts-12.22
+resolver: nightly-2018-12-19
 install-ghc: true
-ghc-options:
-    "$locals": -Werror
 flags: {}
 packages:
 - '.'
 system-ghc: false
 extra-deps:
   - api-tools-0.8.0.2
+  - crypto-numbers-0.2.7
+  - crypto-pubkey-0.2.8
   - serialise-0.2.1.0
   - pbkdf-1.1.1.0
-  - regex-1.0.2.0

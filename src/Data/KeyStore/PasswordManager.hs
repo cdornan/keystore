@@ -1224,7 +1224,7 @@ p_x_pps =
 
 p_pw_id_opt :: PW p => Parser p
 p_pw_id_opt =
-    option (eitherReader $ maybe (fail "password-id not recognised") return . parsePwName . PasswordName . T.pack)
+    option (eitherReader $ maybe (Left "password-id not recognised") return . parsePwName . PasswordName . T.pack)
         $  long    "id"
         <> short   'p'
         <> metavar "PASSWORD-ID"
@@ -1236,7 +1236,7 @@ p_comment :: Parser String
 p_comment = unwords <$> many p_word
 
 p_hash :: Parser ()
-p_hash = argument (eitherReader $ \s->if s=="#" then return () else fail "# expected") $ metavar "#"
+p_hash = argument (eitherReader $ \s->if s=="#" then return () else Left "# expected") $ metavar "#"
 
 h_info :: Parser a -> InfoMod a -> ParserInfo a
 h_info pr = O.info (helper <*> pr)
@@ -1262,7 +1262,7 @@ p_pw pmc =
 
 p_pw_id :: PW p => Parser p
 p_pw_id =
-    argument (eitherReader $ maybe (fail "bad password syntax") return . parsePwName . PasswordName . T.pack)
+    argument (eitherReader $ maybe (Left "bad password syntax") return . parsePwName . PasswordName . T.pack)
         $  metavar "PASSWORD-ID"
         <> help    "a password ID"
 

@@ -385,7 +385,7 @@ load_key'' :: [Name]
            -> Key
            -> EncrypedCopy
            -> KS Key
-load_key'' nm_s nm key@Key{..} ec =
+load_key'' nm_s nm key ec =
     case nm `elem` nm_s of
       True  -> return key
       False ->

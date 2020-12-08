@@ -878,7 +878,7 @@ save_ps' PMConfig{..} AESSecretData{..} = B.writeFile _pmc_location $ B.concat [
     ct_bs = _Binary $ _SecretData _asd_secret_data
 
 get_key :: PW p => PMConfig p -> IO AESKey
-get_key pmc@PMConfig{..} = get_key' pmc >>= maybe (not_logged_in_err pmc) return
+get_key pmc = get_key' pmc >>= maybe (not_logged_in_err pmc) return
 
 not_logged_in_err :: PW p => PMConfig p -> IO a
 not_logged_in_err pmc@PMConfig{..} = do

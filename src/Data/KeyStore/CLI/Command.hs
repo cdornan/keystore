@@ -18,7 +18,7 @@ import           Data.KeyStore.Types
 import           Data.KeyStore.IO.IC
 import           Data.Monoid
 import           Data.String
-import           Text.Regex
+import           Text.KSRegex
 import qualified Data.Text              as T
 import           Options.Applicative
 import           System.Environment

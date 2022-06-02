@@ -20,9 +20,9 @@ module Data.KeyStore.IO.IC
 
 import           Data.KeyStore.KS
 import           Data.KeyStore.Types
+import           Data.KeyStore.Types.AesonCompat
 import           Data.API.Types
-import           Data.Aeson
-import           Data.Text                      as T
+import           Data.Text                      as T    hiding (elem)
 import qualified Data.Map                       as Map
 import qualified Data.ByteString.Base64         as B64
 import qualified Data.ByteString.Char8          as B
@@ -181,7 +181,7 @@ readSettings fp =
       Left  msg -> errorIO msg
       Right val ->
         case val of
-          Object hm -> return $ Settings hm
+          Object hm -> return $ Settings $ fromKM hm
           _         -> errorIO "JSON object expected in the configuration file"
 
 errorIO :: String -> IO a

@@ -15,7 +15,7 @@ import qualified Data.HashMap.Strict          as HM
 
 
 deploy :: IC -> HostID -> IO LBS.ByteString
-deploy ic h = A.encode . A.Object . HM.fromList <$> mapM (extract ic h)
+deploy ic h = A.encode . A.Object . mkKeyMap <$> mapM (extract ic h)
                     [ k | k<-[minBound..maxBound],
                                   maybe True ($ h) $ keyIsHostIndexed k ]
 
@@ -36,7 +36,7 @@ extract ic h k = mk <$> locate ic h k
         K_ssl           -> clear_text k key
 
 hash :: KeyID -> Key -> A.Value
-hash k Key{..} = chk $ A.Object $ HM.fromList
+hash k Key{..} = chk $ A.Object $ mkKeyMap
     [ (,) "name"     $ A.toJSON _key_name
     , (,) "identity" $ A.toJSON _key_identity
     , (,) "comment"  $ A.toJSON _key_comment
@@ -48,7 +48,7 @@ hash k Key{..} = chk $ A.Object $ HM.fromList
     oops  = error $ encode k ++ ": hash not present"
 
 clear_text :: KeyID -> Key -> A.Value
-clear_text k Key{..} = chk $ A.Object $ HM.fromList
+clear_text k Key{..} = chk $ A.Object $ mkKeyMap
     [ (,) "name"       $ A.toJSON _key_name
     , (,) "identity"   $ A.toJSON _key_identity
     , (,) "comment"    $ A.toJSON _key_comment
@@ -69,3 +69,7 @@ locate ic h k = retrieve ic h k >>= \ei -> check ei >>= tst
 
     tst []      = error $ encode k ++ ": key not present in the this section"
     tst (key:_) = return key
+
+
+mkKeyMap :: [(T.Text,a)] -> A.Object
+mkKeyMap = undefined (HM.fromList :: [(T.Text,a)] -> HM.HashMap T.Text a)

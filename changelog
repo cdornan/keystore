@@ -113,3 +113,9 @@
 
 0.7.0.1 Chris Dornan <chrisd@irisconnect.co.uk> 2014-12-04
 	* Data.KeyStore.Sections: export mkSection
+
+0.9.0.0 Chris Dornan <chrisd@irisconnect.co.uk> 2022-06-02
+  * fix for GHC 9.2
+  * switch cryptonite in place of older deprecated packages
+  * upgrade to aeson-2.*
+  * upgrade to api-tools 0.10.*

@@ -73,9 +73,9 @@ import           Data.KeyStore.IO.IC
 import           Data.KeyStore.KS
 import           Data.KeyStore.KS.KS
 import           Data.KeyStore.Types
+import           Data.KeyStore.Types.AesonCompat
 import           Data.API.Types
 import           Data.IORef
-import           Data.Aeson
 import qualified Data.Text                      as T
 import qualified Data.ByteString.Char8          as B
 import qualified Data.ByteString.Lazy.Char8     as LBS
@@ -147,7 +147,7 @@ listTriggers ic = triggers ic >>= putStr . unlines . map fmt
       where
         id_s   = T.unpack   $ _TriggerID                  _trg_id
         pat_s  = _pat_string                              _trg_pattern
-        stgs_s = LBS.unpack $ encode $ Object $ _Settings _trg_settings
+        stgs_s = LBS.unpack $ encode $ Object $ intoKM $ _Settings _trg_settings
 
 -- | Returns the striggers setup on the keystore.
 triggers :: IC -> IO [Trigger]

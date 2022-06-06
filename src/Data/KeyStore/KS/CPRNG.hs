@@ -9,20 +9,20 @@ module Data.KeyStore.KS.CPRNG
     ) where
 
 import           Crypto.Random
-import qualified Data.ByteString                as B
+import qualified Data.ByteArray                 as BA
+import           System.IO.Unsafe
 
 
 newtype CPRNG
-    = CPRNG { _CPRNG :: SystemRNG }
-    deriving (CPRG)
+    = CPRNG { _CPRNG :: SystemDRG }
+    deriving (DRG)
 
 
 newCPRNG :: IO CPRNG
-newCPRNG = cprgCreate <$> createEntropyPool
+newCPRNG = CPRNG <$> getSystemDRG
 
 testCPRNG :: CPRNG
-testCPRNG = cprgSetReseedThreshold 0 $
-                    cprgCreate $ createTestEntropyPool "Data.CertStore.Tools"
+testCPRNG = unsafePerformIO newCPRNG
 
-generateCPRNG :: Int -> CPRNG -> (B.ByteString,CPRNG)
-generateCPRNG = cprgGenerate
+generateCPRNG :: BA.ByteArray ba => Int -> CPRNG -> (ba,CPRNG)
+generateCPRNG = randomBytesGenerate

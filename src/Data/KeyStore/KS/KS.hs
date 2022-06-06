@@ -7,6 +7,7 @@ module Data.KeyStore.KS.KS
     , Ctx(..)
     , State(..)
     , LogEntry(..)
+    , rsaErrorKS
     , withKey
     , trun
     , e2io
@@ -28,8 +29,8 @@ module Data.KeyStore.KS.KS
     , insertKey
     , adjustKeyKS
     , deleteKeysKS
-    , randomRSA
-    , randomKS
+    -- , randomRSA
+    -- , randomKS
     , getKeymap
     , getConfig
     , modConfig
@@ -39,7 +40,9 @@ import           Data.KeyStore.KS.CPRNG
 import           Data.KeyStore.KS.Configuration
 import           Data.KeyStore.KS.Opt
 import           Data.KeyStore.Types
-import           Crypto.PubKey.RSA
+import qualified Data.ByteArray                 as BA
+-- import           Crypto.PubKey.RSA
+import           Crypto.Random.Types
 import qualified Data.Map                       as Map
 import qualified Data.ByteString                as B
 import           Data.Typeable
@@ -48,6 +51,7 @@ import           Control.Monad.RWS.Strict
 import qualified Control.Monad.Error            as E
 import           Control.Exception
 import           Control.Lens
+import           Crypto.PubKey.RSA.Types
 
 
 newtype KS a = KS { _KS :: E.ErrorT Reason (RWS Ctx [LogEntry] State) a }
@@ -74,6 +78,21 @@ data LogEntry
         , le_message :: String
         }
     deriving (Show)
+
+
+instance MonadRandom KS where
+  getRandomBytes sz = KS $ state upd
+    where
+      upd :: BA.ByteArray ba => State -> (ba,State)
+      upd st = (ba,st')
+        where
+          st' = st
+            { st_cprng = cprg'
+            }
+          (ba,cprg') = generateCPRNG sz $ st_cprng st
+
+rsaErrorKS :: KS (Either Error a) -> KS a
+rsaErrorKS ks_e = either (throwKS . rsaError) return =<< ks_e
 
 withKey :: Name -> KS a -> KS a
 withKey nm p =
@@ -111,7 +130,7 @@ run_ :: Ctx -> State -> KS a -> (E a,State,[LogEntry])
 run_ c s p = runRWS (E.runErrorT (_KS p)) c s
 
 randomBytes :: Octets -> (B.ByteString->a) -> KS a
-randomBytes (Octets sz) k = k <$> randomKS (generateCPRNG sz)
+randomBytes (Octets sz) k = fmap k $ getRandomBytes sz
 
 currentTime :: KS UTCTime
 currentTime = ctx_now <$> KS ask
@@ -177,16 +196,6 @@ deleteKeysKS nms =
   where
     tst key = or [ any (`elem` safeguardKeys sg) nms |
                                     sg<-Map.keys $ _key_secret_copies key ]
-
-randomRSA :: (CPRNG->(Either Error a,CPRNG)) -> KS a
-randomRSA f = randomKS f >>= either (throwKS . rsaError) return
-
-randomKS :: (CPRNG->(a,CPRNG)) -> KS a
-randomKS f = KS $
- do s <- get
-    let (x,!g') = f $ st_cprng s
-    put s { st_cprng = g' }
-    return x
 
 getKeymap :: KS KeyMap
 getKeymap = _ks_keymap.st_keystore <$> KS get

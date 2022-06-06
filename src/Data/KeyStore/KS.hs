@@ -39,8 +39,8 @@ import           Data.KeyStore.KS.Opt
 import           Data.KeyStore.KS.Configuration
 import           Data.KeyStore.KS.CPRNG
 import           Data.KeyStore.Types
+import           Data.KeyStore.Types.AesonCompat
 import           Data.API.JSON
-import           Data.Aeson
 import qualified Data.ByteString.Lazy           as LBS
 import qualified Data.Map                       as Map
 import qualified Data.Text                      as T
@@ -77,7 +77,7 @@ keyStoreFromBytes = chk . either (const Nothing) Just . decodeWithErrs
 settingsFromBytes :: LBS.ByteString -> E Settings
 settingsFromBytes = chk . either (const Nothing) Just . decodeWithErrs
   where
-    chk (Just(Object fm)) = Right $ Settings fm
+    chk (Just(Object fm)) = Right $ Settings $ fromKM fm
     chk _                 = Left  $ strMsg "failed to decode JSON settings"
 
 

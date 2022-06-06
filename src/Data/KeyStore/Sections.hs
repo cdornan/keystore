@@ -39,13 +39,13 @@ module Data.KeyStore.Sections
 
 import           Data.KeyStore.IO
 import           Data.KeyStore.KS
-import qualified Data.Text                      as T
-import qualified Data.ByteString.Char8          as B
-import qualified Data.ByteString.Lazy.Char8     as LBS
-import qualified Data.Aeson                     as A
-import qualified Data.HashMap.Strict            as HM
-import qualified Data.Vector                    as V
-import qualified Data.Map                       as Map
+import qualified Data.KeyStore.Types.AesonCompat  as A
+import qualified Data.Text                        as T
+import qualified Data.ByteString.Char8            as B
+import qualified Data.ByteString.Lazy.Char8       as LBS
+import qualified Data.HashMap.Strict              as HM
+import qualified Data.Vector                      as V
+import qualified Data.Map                         as Map
 import           Data.API.Types
 import           Data.Maybe
 import           Data.List
@@ -295,7 +295,7 @@ sectionHelp   (Just s) = do
 
     f   = uncurry $ printf "%-20s %s"
 
-    fmt_s stgs = map ("    "++) $ lines $ LBS.unpack $ A.encode $ A.Object $ _Settings stgs
+    fmt_s stgs = map ("    "++) $ lines $ LBS.unpack $ A.encode $ A.Object $ A.intoKM $ _Settings stgs
 
 -- | List a shell script for establishing all of the keys in the environment. NB For this
 -- to work the password for the top section (or the passwords for all of the sections
@@ -690,7 +690,7 @@ instance Functor Munch where
   fmap f m = m >>= \x -> return $ f x
 
 instance Applicative Munch where
-  pure  = return
+  pure x  = Munch $ \s -> Just (x,s)
   (<*>) = ap
 
 instance Alternative Munch where
@@ -698,7 +698,7 @@ instance Alternative Munch where
   (<|>) x y = Munch $ \s -> _Munch x s <|> _Munch y s
 
 instance Monad Munch where
-  return x  = Munch $ \s -> Just (x,s)
+  return = pure
   (>>=) m f = Munch $ \s -> _Munch m s >>= \(x,s') -> _Munch (f x) s'
 
 run_munch :: Munch a -> String -> Maybe a

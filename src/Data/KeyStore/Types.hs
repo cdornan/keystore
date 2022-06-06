@@ -43,11 +43,12 @@ import           Data.KeyStore.Types.Schema
 import           Data.KeyStore.Types.NameAndSafeguard
 import           Data.KeyStore.Types.E
 import           Data.KeyStore.Types.UTC
-import           Data.Aeson
+import           Data.KeyStore.Types.AesonCompat
 import           Data.API.Tools
 import           Data.API.JSON
 import           Data.API.Types
 import qualified Data.ByteString                as B
+import           Data.Coerce
 import qualified Data.HashMap.Strict            as HM
 import           Data.List
 import qualified Data.Map                       as Map
@@ -56,7 +57,7 @@ import qualified Data.Text                      as T
 import           Data.Time
 import           Data.String
 import qualified Data.Vector                    as V
-import           Text.Regex
+import           Text.KSRegex
 
 
 $(generate                         keystoreSchema)
@@ -105,19 +106,20 @@ prj_pattern :: Pattern -> REP__Pattern
 prj_pattern = REP__Pattern . T.pack . _pat_string
 
 
-newtype Settings = Settings { _Settings :: Object }
+newtype Settings = Settings { _Settings :: HM.HashMap T.Text Value }
     deriving (Eq,Show)
 
 inj_settings :: REP__Settings -> ParserWithErrs Settings
-inj_settings REP__Settings { _stgs_json = Object hm}
-                = return $ Settings hm
+inj_settings REP__Settings { _stgs_json = Object o}
+                = return $ Settings $ fromKM o
 inj_settings _  = fail "object expected for settings"
 
 prj_settings :: Settings -> REP__Settings
-prj_settings (Settings hm) = REP__Settings { _stgs_json = Object hm }
+prj_settings (Settings hm) = REP__Settings { _stgs_json = Object $ intoKM hm }
 
 defaultSettings :: Settings
 defaultSettings = mempty
+
 
 
 #if __GLASGOW_HASKELL__ >= 804
@@ -126,8 +128,8 @@ instance Semigroup Settings where
 #endif
 
 instance Monoid Settings where
-  mempty  = Settings HM.empty
-  mappend = mappendSettings
+  mempty  = Settings mempty
+  -- mappend = mappendSettings
 
 mappendSettings :: Settings -> Settings -> Settings
 mappendSettings (Settings fm_0) (Settings fm_1) =
@@ -136,7 +138,7 @@ mappendSettings (Settings fm_0) (Settings fm_1) =
     cmb v0 v1 =
       case (v0,v1) of
         (Array v_0,Array v_1) -> Array $ v_0 V.++ v_1
-        _                   -> marker
+        _                     -> marker
 
 checkSettingsCollisions :: Settings -> [SettingID]
 checkSettingsCollisions (Settings hm) =

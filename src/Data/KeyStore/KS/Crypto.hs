@@ -3,6 +3,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE BangPatterns               #-}
+{-# LANGUAGE RankNTypes                 #-}
+{-# LANGUAGE PackageImports             #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TypeApplications           #-}
 
 module Data.KeyStore.KS.Crypto
   ( sizeAesIV
@@ -55,12 +59,20 @@ import qualified Data.ASN1.BinaryEncoding       as A
 import qualified Data.ASN1.Types                as A
 import qualified Data.ByteString.Lazy.Char8     as LBS
 import qualified Data.ByteString.Char8          as B
+import           Data.Coerce
+import           Data.Maybe
+import           Data.Typeable
+import           Crypto.Error
+import           Crypto.Hash.Algorithms
 import           Crypto.PubKey.RSA
 import qualified Crypto.PubKey.RSA.OAEP         as OAEP
 import qualified Crypto.PubKey.RSA.PSS          as PSS
-import           Crypto.PubKey.HashDescr
 import           Crypto.PubKey.MaskGenFunction
 import           Crypto.Cipher.AES
+import qualified Crypto.Types.PubKey.RSA        as CPT
+
+-- avoiding class with crypto-pubkey-types which we are using for DER generation
+import qualified "cryptonite" Crypto.Cipher.Types as CCT
 
 
 sizeAesIV, sizeOAE :: Octets
@@ -219,23 +231,23 @@ decodeRSASecretData_ dat0 =
 
 encryptRSAKS :: PublicKey -> AESKey -> KS RSAEncryptedKey
 encryptRSAKS pk (AESKey (Binary dat)) =
-    RSAEncryptedKey . Binary <$> randomRSA (\g->OAEP.encrypt g oaep pk dat)
+    fmap (RSAEncryptedKey . Binary) $ rsaErrorKS $ OAEP.encrypt oaep pk dat
 
 decryptRSAKS :: PrivateKey -> RSAEncryptedKey -> KS AESKey
 decryptRSAKS pk rek = either throwKS return $ decryptRSAE pk rek
 
 decryptRSAE :: PrivateKey -> RSAEncryptedKey -> E AESKey
-decryptRSAE pk rek =
-    rsa2e $ fmap (AESKey . Binary) $
-                OAEP.decrypt Nothing oaep pk $ _Binary $ _RSAEncryptedKey rek
+decryptRSAE pk rek = rsa2e $ fmap (AESKey . Binary) $
+    OAEP.decrypt Nothing oaep pk $ _Binary $ _RSAEncryptedKey rek
 
-oaep :: OAEP.OAEPParams
-oaep =
-    OAEP.OAEPParams
-        { OAEP.oaepHash       = hashFunction hashDescrSHA512
-        , OAEP.oaepMaskGenAlg = mgf1
-        , OAEP.oaepLabel      = Nothing
-        }
+type OAEPparams = OAEP.OAEPParams SHA512 B.ByteString B.ByteString
+
+oaep :: OAEPparams
+oaep = OAEP.OAEPParams
+    { OAEP.oaepHash       = SHA512
+    , OAEP.oaepMaskGenAlg = mgf1 SHA512
+    , OAEP.oaepLabel      = Nothing
+    }
 
 
 --
@@ -244,14 +256,16 @@ oaep =
 
 signKS :: PrivateKey -> ClearText -> KS RSASignature
 signKS pk dat =
-    RSASignature . Binary <$>
-          randomRSA (\g->PSS.sign g Nothing pssp pk $ _Binary $ _ClearText dat)
+    fmap (RSASignature . Binary) $
+          rsaErrorKS $ PSS.sign Nothing pssp pk $ _Binary $ _ClearText dat
 
 verifyKS :: PublicKey -> ClearText -> RSASignature -> Bool
 verifyKS pk (ClearText (Binary dat)) (RSASignature (Binary sig)) = PSS.verify pssp pk dat sig
 
-pssp :: PSS.PSSParams
-pssp = PSS.defaultPSSParams $ hashFunction hashDescrSHA512
+type PSSparams = PSS.PSSParams SHA512 B.ByteString B.ByteString
+
+pssp :: PSSparams
+pssp = PSS.defaultPSSParams SHA512
 
 
 --
@@ -265,24 +279,49 @@ encryptAESKS aek ct =
     return $ encryptAES aek iv ct
 
 encryptAES :: AESKey -> IV -> ClearText -> AESSecretData
-encryptAES (AESKey (Binary ky)) (IV (Binary iv)) (ClearText (Binary dat)) =
+encryptAES aek iv (ClearText (Binary dat)) =
     AESSecretData
-        { _asd_iv          = IV $ Binary iv
-        , _asd_secret_data = SecretData $ Binary $ encryptCTR (initAES ky) iv dat
+        { _asd_iv          = iv
+        , _asd_secret_data = SecretData $ Binary $ encryptCTR aek iv dat
         }
 
 decryptAES :: AESKey -> AESSecretData -> ClearText
-decryptAES aek AESSecretData{..} =
-    ClearText $ Binary $
-        encryptCTR (initAES $ _Binary $ _AESKey aek             )
-                   (_Binary $ _IV               _asd_iv         )
-                   (_Binary $ _SecretData       _asd_secret_data)
+decryptAES aek AESSecretData{..} = ClearText $ Binary $
+        encryptCTR aek _asd_iv $ _Binary $ _SecretData _asd_secret_data
 
 randomAESKeyKS :: Cipher -> KS AESKey
-randomAESKeyKS cip = randomBytes (keyWidth cip) (AESKey . Binary)
+randomAESKeyKS cip = randomBytes (keyWidth cip) $ AESKey . Binary
 
 randomIVKS :: KS IV
-randomIVKS = randomBytes sizeAesIV (IV . Binary)
+randomIVKS = randomBytes sizeAesIV $ IV . Binary
+
+encryptCTR :: AESKey -> IV -> B.ByteString -> B.ByteString
+encryptCTR aek = case B.length $ coerce aek of
+    16 -> aes_ctr (Proxy @AES128) aek
+    24 -> aes_ctr (Proxy @AES192) aek
+    32 -> aes_ctr (Proxy @AES256) aek
+    ln -> error $ "aek_from_key: unexpected AES key size: " ++ show ln
+
+aes_ctr :: forall k . (CCT.BlockCipher k,Typeable k)
+        => Proxy k -> AESKey -> IV -> B.ByteString -> B.ByteString
+aes_ctr pxy aek iv msg = CCT.ctrCombine ky_ iv_ msg
+  where
+    ky_ :: k
+    ky_ = case CCT.cipherInit ky_b of
+      CryptoFailed _ -> oops "key"
+      CryptoPassed z -> z
+
+    iv_ :: CCT.IV k
+    iv_ = fromMaybe (oops "IV") $ CCT.makeIV iv_b
+
+    oops :: String -> a
+    oops thg = error $ tynm ++ " cryption error: mismatched size of "++thg
+
+    tynm :: String
+    tynm = show $ typeRep pxy
+
+    AESKey (Binary ky_b) = aek
+    IV     (Binary iv_b) = iv
 
 
 --
@@ -324,9 +363,6 @@ hashKS_ hd@HashDescription{..} ct =
                                         _hashd_width_octets (HashData . Binary)
         }
 
---randomSalt :: KS Salt
---randomSalt = randomBytes size_salt Salt
-
 --
 -- Generating a private/public key pair
 --
@@ -341,7 +377,7 @@ generateKeysKS :: KS (PublicKey,PrivateKey)
 generateKeysKS = generateKeysKS_ default_key_size
 
 generateKeysKS_ :: Int -> KS (PublicKey,PrivateKey)
-generateKeysKS_ ksz = randomKS $ \g->generate g ksz default_e
+generateKeysKS_ ksz = generate ksz default_e
 
 
 --
@@ -360,8 +396,43 @@ encodePrivateKeyDER = ClearText . Binary . encodeDER
 encodePublicKeyDER :: PublicKey -> ClearText
 encodePublicKeyDER = ClearText . Binary . encodeDER
 
-decodeDERE :: A.ASN1Object a => B.ByteString -> E a
-decodeDERE bs =
+
+class ASN1 a where
+  decodeDERE :: B.ByteString -> E a
+  encodeDER  :: a -> B.ByteString
+
+
+instance ASN1 PrivateKey where
+  decodeDERE = fmap privateFromCPT . decodeDERE_
+  encodeDER  = encodeDER_ . privateIntoCPT
+
+instance ASN1 PublicKey  where
+  decodeDERE = fmap publicFromCPT . decodeDERE_
+  encodeDER  = encodeDER_ . publicIntoCPT
+
+privateFromCPT :: CPT.PrivateKey -> PrivateKey
+privateFromCPT CPT.PrivateKey{..} =
+  PrivateKey
+    { private_pub  = publicFromCPT private_pub
+    , ..
+    }
+
+privateIntoCPT :: PrivateKey -> CPT.PrivateKey
+privateIntoCPT PrivateKey{..} =
+  CPT.PrivateKey
+    { private_pub  = publicIntoCPT private_pub
+    , ..
+    }
+
+publicFromCPT :: CPT.PublicKey -> PublicKey
+publicFromCPT CPT.PublicKey{..} = PublicKey{..}
+
+publicIntoCPT :: PublicKey -> CPT.PublicKey
+publicIntoCPT PublicKey{..} = CPT.PublicKey{..}
+
+
+decodeDERE_ :: A.ASN1Object a => B.ByteString -> E a
+decodeDERE_ bs =
     case A.decodeASN1 A.DER $ lzy bs of
       Left err -> Left $ strMsg $ show err
       Right as ->
@@ -374,8 +445,8 @@ decodeDERE bs =
   where
     lzy = LBS.pack . B.unpack
 
-encodeDER :: A.ASN1Object a => a -> B.ByteString
-encodeDER = egr . A.encodeASN1 A.DER  . flip A.toASN1 []
+encodeDER_ :: A.ASN1Object a => a -> B.ByteString
+encodeDER_ = egr . A.encodeASN1 A.DER  . flip A.toASN1 []
   where
     egr = B.pack . LBS.unpack
 

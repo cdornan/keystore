@@ -16,7 +16,7 @@ import           Data.API.Types
 import qualified Data.ByteString                as B
 import qualified Data.ByteString.Char8          as BC
 import qualified Data.ByteString.Lazy.Char8     as LBS
-import           Data.ByteString.Lazy.Builder
+import           Data.ByteString.Builder
 import           Data.Word
 import           Data.Bits
 import           Data.Char

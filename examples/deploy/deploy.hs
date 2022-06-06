@@ -67,7 +67,7 @@ main = do
               C_sign -> return ()
               _      -> verify_ks True ic_ro
             case cc_cmd of
-              C_create                      -> error "main: Initialise"
+              -- C_create                      -> error "main: Initialise"
               C_rotate          mbh mbs mbk -> rotate          ic $ key_prededicate mbh mbs mbk
               C_rotate_smart    mbh mbs mbk -> rotateIfChanged ic $ key_prededicate mbh mbs mbk
               C_deploy    False mb hst      -> deploy ic_ro hst           >>= write mb
@@ -75,14 +75,14 @@ main = do
               C_client                      -> lookupEnv "KEY_pw_session" >>= putStrLn . ("session-token=>" ++) . maybe "NONE" id
               C_sign                        -> sign_ks ic_ro
               C_verify                      -> T.putStrLn "the keystore matches the signature"
-              C_list_hosts                  -> error "main: ListHosts"
+              -- C_list_hosts                  -> error "main: ListHosts"
               C_info_key        mbk         -> T.putStr $ keyHelp mbk
               C_info_section    mbs         -> sectionHelp mbs                          >>= T.putStr
               C_secret_script               -> secretKeySummary ic sections             >>= T.putStr
               C_public_script               -> publicKeySummary ic sections ks_mac_fp   >>= T.putStr
-              C_sample_script               -> error "main: SampleScript"
-              C_ks              _           -> error "main: KS"
-              C_pm              _           -> error "main: PM"
+              -- C_sample_script               -> error "main: SampleScript"
+              -- C_ks              _           -> error "main: KS"
+              -- C_pm              _           -> error "main: PM"
             verify_ks False ic_ro
 
 create_cc, deploy_cc, client_cc :: CollectConfig SectionID

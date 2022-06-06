@@ -5,7 +5,7 @@ module Data.KeyStore.KS.Configuration where
 import           Data.KeyStore.Types
 import qualified Data.Map               as Map
 import           Data.Maybe
-import           Text.Regex
+import           Text.KSRegex
 
 
 configurationSettings :: Configuration -> Settings

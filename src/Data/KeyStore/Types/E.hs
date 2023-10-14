@@ -3,7 +3,7 @@
 module Data.KeyStore.Types.E
     ( E
     , Reason
-    , E.strMsg
+    , strMsg
     , rsaError
     , eWrap
     , showReason
@@ -11,7 +11,7 @@ module Data.KeyStore.Types.E
 
 import           Crypto.PubKey.RSA
 import           Data.Typeable
-import qualified Control.Monad.Error            as E
+import qualified Control.Monad.Except           as E
 import qualified Control.Exception              as X
 import           System.IO
 import           System.Exit
@@ -27,9 +27,12 @@ data Reason
 
 instance X.Exception Reason
 
-instance E.Error Reason where
-    noMsg  = R_GEN
-    strMsg = R_MSG
+-- instance E.Error Reason where
+--     noMsg  = R_GEN
+--     strMsg = R_MSG
+
+strMsg :: String -> Reason
+strMsg = R_MSG
 
 rsaError :: Error -> Reason
 rsaError = R_RSA

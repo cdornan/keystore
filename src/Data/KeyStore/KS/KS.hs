@@ -48,13 +48,13 @@ import qualified Data.ByteString                as B
 import           Data.Typeable
 import           Data.Time
 import           Control.Monad.RWS.Strict
-import qualified Control.Monad.Error            as E
+import qualified Control.Monad.Except           as E
 import           Control.Exception
 import           Control.Lens
 import           Crypto.PubKey.RSA.Types
 
 
-newtype KS a = KS { _KS :: E.ErrorT Reason (RWS Ctx [LogEntry] State) a }
+newtype KS a = KS { _KS :: E.ExceptT Reason (RWS Ctx [LogEntry] State) a }
     deriving (Functor, Applicative, Monad, E.MonadError Reason)
 
 data Ctx
@@ -127,7 +127,7 @@ e2ks :: E a -> KS a
 e2ks = either throwKS return
 
 run_ :: Ctx -> State -> KS a -> (E a,State,[LogEntry])
-run_ c s p = runRWS (E.runErrorT (_KS p)) c s
+run_ c s p = runRWS (E.runExceptT (_KS p)) c s
 
 randomBytes :: Octets -> (B.ByteString->a) -> KS a
 randomBytes (Octets sz) k = fmap k $ getRandomBytes sz

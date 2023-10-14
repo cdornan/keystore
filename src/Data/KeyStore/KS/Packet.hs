@@ -22,7 +22,7 @@ import           Data.Bits
 import           Data.Char
 import           Text.Printf
 import           Control.Monad.RWS.Strict
-import qualified Control.Monad.Error            as E
+import qualified Control.Monad.Except           as E
 
 
 newtype MagicWord = MagicWord B.ByteString
@@ -95,7 +95,7 @@ decodeLengthPacket bp =
 
 type ShowB = B.ByteString -> B.ByteString
 
-newtype BP a = BP { _BP :: E.ErrorT Reason (RWS () [LogEntry] B.ByteString) a }
+newtype BP a = BP { _BP :: E.ExceptT Reason (RWS () [LogEntry] B.ByteString) a }
     deriving (Functor, Applicative, Monad, E.MonadError Reason)
 
 e2bp :: E a -> BP a
@@ -110,7 +110,7 @@ run bs bp =
     (e,bs',_) = runBP bs bp
 
 runBP :: B.ByteString -> BP a -> (E a,B.ByteString,[LogEntry])
-runBP s p = runRWS (E.runErrorT (_BP p)) () s
+runBP s p = runRWS (E.runExceptT (_BP p)) () s
 
 testBP :: B.ByteString -> BP a -> IO a
 testBP bs p =

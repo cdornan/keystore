@@ -1,4 +1,4 @@
-resolver: nightly-2023-10-09
+resolver: lts-20.26
 
 ghc-options:
   atlas: "-Wall -Werror -j"
@@ -11,3 +11,4 @@ allow-newer: true
 extra-deps:
 - api-tools-0.10.1.0
 - pbkdf-1.1.1.1
+- crypton-0.33

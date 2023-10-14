@@ -72,7 +72,7 @@ import           Crypto.Cipher.AES
 import qualified Crypto.Types.PubKey.RSA        as CPT
 
 -- avoiding class with crypto-pubkey-types which we are using for DER generation
-import qualified "cryptonite" Crypto.Cipher.Types as CCT
+import qualified "crypton" Crypto.Cipher.Types as CCT
 
 
 sizeAesIV, sizeOAE :: Octets
